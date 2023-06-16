@@ -74,7 +74,7 @@
               <b-input-group append="€">
                 <b-input v-model.number="input.batteryCostsPerKwh" min="0" type="number" step="100" />
               </b-input-group>
-            </b-form-group>
+            </b-form-group> 
           </b-form>
         </b-collapse>
       </b-col>
@@ -156,6 +156,11 @@
                 <b-form-tags input-id="tags-basic" v-model="inputBatterySizes" :tag-validator="tagValidator"
                   v-b-tooltip.hover title='Zwischen 0,2 und 200 kWh'
                   :input-attrs="{ 'aria-describedby': 'tags-validation-help' }"></b-form-tags>
+              </b-input-group>
+            </b-form-group>
+            <b-form-group label="Speicherkosten einmalig:">
+              <b-input-group append="€">
+                <b-input v-model.number="input.batteryCostsFixed" min="0" type="number" step="100" />
               </b-input-group>
             </b-form-group>
             <b-form-group label="Vergleichsjahr:">
@@ -364,6 +369,7 @@ export default {
         consumptionCosts: 0.32,
         feedInCompensation: 0.086,
         installationCostsWithoutBattery: 10000,
+        batteryCostsFixed: 0,
         batteryCostsPerKwh: 500,
         systemloss: 12,
         batteryLoadEfficiency: 99,
@@ -499,9 +505,9 @@ export default {
         const selfUseRate = selfUsedPower / generationYear * 100 // Eigenverbrauchsquote
         const costSavings = (selfUsedPower * this.input.consumptionCosts + fedInPower * this.input.feedInCompensation)
         if (size == 1) costSavingWithoutBattery = costSavings;
-        const amortization = (this.input.installationCostsWithoutBattery + this.input.batteryCostsPerKwh * (size / 1000)) / costSavings
+        const amortization = (this.input.installationCostsWithoutBattery + this.input.batteryCostsFixed + this.input.batteryCostsPerKwh * (size / 1000)) / costSavings
         const costSavingsBattery = size == 1 ? 0 : costSavings - costSavingWithoutBattery
-        const batteryAmortization = size == 1 ? 0 : this.input.batteryCostsPerKwh * (size / 1000) / costSavingsBattery
+        const batteryAmortization = size == 1 ? 0 : this.input.batteryCostsFixed + this.input.batteryCostsPerKwh * (size / 1000) / costSavingsBattery
 
         const monthlyDataObj = energyFlowData.reduce((prev, curr) => {
           const month = parseInt(curr.dayTime.slice(4, 6))
