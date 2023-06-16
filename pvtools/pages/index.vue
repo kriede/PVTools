@@ -505,7 +505,7 @@ export default {
         const selfUseRate = selfUsedPower / generationYear * 100 // Eigenverbrauchsquote
         const costSavings = (selfUsedPower * this.input.consumptionCosts + fedInPower * this.input.feedInCompensation)
         if (size == 1) costSavingWithoutBattery = costSavings;
-        const amortization = (this.input.installationCostsWithoutBattery + this.input.batteryCostsFixed + this.input.batteryCostsPerKwh * (size / 1000)) / costSavings
+        const amortization = (this.input.installationCostsWithoutBattery + (size == 1 ? 0 : this.input.batteryCostsFixed + this.input.batteryCostsPerKwh * (size / 1000))) / costSavings
         const costSavingsBattery = size == 1 ? 0 : costSavings - costSavingWithoutBattery
         const batteryAmortization = size == 1 ? 0 : this.input.batteryCostsFixed + this.input.batteryCostsPerKwh * (size / 1000) / costSavingsBattery
 
