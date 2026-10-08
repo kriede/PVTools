@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start-server": "tsc && node dist/index.js",
-    "start": "nodemon -e ts -w ./ -x npm run start-server"
+    "start": "nodemon -e ts -w ./ -x npm run start-server",
+    "test": "tsc && node --test api/relay.test.js"
   },
   "keywords": [],
   "author": "",

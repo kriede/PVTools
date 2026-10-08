@@ -33,13 +33,19 @@
               <b-input-group append="Straße, PLZ Stadt">
                 <b-form-input v-model="inputAddressSearchString"
                   placeholder="z.B. 50667 Köln" v-b-tooltip.hover
-                  title='Beim verlassen des Feldes wird der Standort gesucht' />
+                  title="Enter an address, then click the search button."
+                  @keydown.enter.prevent="getCoordinatesByAddress" />
                 </b-input-group>
                 <b-input-group-append>
-                  <b-button variant="info" @click="getCoordinatesByAddress">Suche nach Adresse</b-button>
+                  <b-button variant="info" :disabled="isSearchingAddress" @click="getCoordinatesByAddress">
+                    {{ isSearchingAddress ? 'Searching…' : 'Suche nach Adresse' }}
+                  </b-button>
                 </b-input-group-append>
             </b-form-group>
 
+            <b-alert v-if="addressSearchError" variant="danger" show>
+              {{ addressSearchError }}
+            </b-alert>
             <b-form-group label="Koordinaten:" v-if="adressData.lon && adressData.lat">
               <b-input-group>
                 <b-form-input readonly v-model="adressData.lat" />
@@ -97,7 +103,7 @@
               </b-form-group>
               <b-form-group label="Installierte Leistung">
                 <b-input-group append="Wp">
-                  <b-input v-model.number="roofInput.peakpower" min="1" type="number" step="100" required v-b-tooltip.hover
+                  <b-input v-model.number="roofInput.peakpower" min="1" type="number" step="1" required v-b-tooltip.hover
                     title='Bei 10kWp muss "10000" eingetragen werden' />
                 </b-input-group>
               </b-form-group>
@@ -139,8 +145,8 @@
 
             <b-button-group class="mt-3">
               <b-button variant="primary" @click="generateData"
-                :disabled="(!adressData.lat && !adressData.lon) || input.roofs.length == 0"
-                :title="(!adressData.lat && !adressData.lon) || input.roofs.length == 0 ? 'Füge eine Adresse und mindestens eine PV Ausrichtung hinzu' : ''"
+                :disabled="isCalculating || isSearchingAddress || !adressData.lat || !adressData.lon || input.roofs.length == 0"
+                :title="(!adressData.lat || !adressData.lon) || input.roofs.length == 0 ? 'Füge eine Adresse und mindestens eine PV Ausrichtung hinzu' : ''"
                 v-b-toggle.inputCollapse>
                 Berechnen
               </b-button>
@@ -150,6 +156,9 @@
               <b-button v-b-toggle.extensionsCollapse>Erweiterte Einstellungen</b-button>
             </b-button-group>
 
+          <b-alert v-if="calculationError" variant="danger" show class="mt-3">
+            {{ calculationError }}
+          </b-alert>
           <b-collapse id="extensionsCollapse">
             <b-form-group label="Speichergrößen:">
               <b-input-group append="Wh">
@@ -388,6 +397,7 @@ export default {
       },
       timeNeeded: 0,
       isCalculating: false,
+      calculationError: "",
       roofInput: {
         aspect: 0,
         angle: 0,
@@ -396,6 +406,8 @@ export default {
       roofsData: [],
       inputAddressSearchString: localStorage.getItem('storedInputAddressSearchString') || "",
       adressData: JSON.parse(localStorage.getItem('storedAddress')) || {},
+      isSearchingAddress: false,
+      addressSearchError: "",
       costSavingsWithoutBattery: 0,
       screenHeight: 0,
       years: [
@@ -417,6 +429,24 @@ export default {
   methods: {
 
     async generateData() {
+      if (this.isCalculating) return
+      this.calculationError = ""
+      if (!this.adressData.lat || !this.adressData.lon || this.input.roofs.length === 0) {
+        this.calculationError = "Please select an address and add at least one PV orientation."
+        return
+      }
+      this.isCalculating = true
+      try {
+        await this.calculateData()
+      } catch {
+        this.roofsData = []
+        this.displayData = []
+        this.calculationError = "Calculation failed. Check that the backend is running and try again. The PVGIS service may be temporarily unavailable."
+      } finally {
+        this.isCalculating = false
+      }
+    },
+    async calculateData() {
       if (localStorage /* function to detect if localstorage is supported*/) {
         localStorage.setItem('storedInput', JSON.stringify(this.input))
         localStorage.setItem('storedInputAddressSearchString', this.inputAddressSearchString)
@@ -446,9 +476,12 @@ export default {
           }),
           method: "GET",
           body: {}
-        })
+        }, { timeout: 20000 })
           .then(response => response.data)
           .then(data => {
+            if (!data || !data.outputs || !Array.isArray(data.outputs.hourly) || data.outputs.hourly.length === 0) {
+              throw new Error("PVGIS returned no hourly generation data")
+            }
             const normData = normalizeHourlyRadiation(data.outputs.hourly)
             const generationYear = Object.values(normData).reduce((prev, curr) => prev + curr.P,0) / 1000
             this.roofsData.push({...roof, generationYear })
@@ -598,19 +631,38 @@ export default {
       this.displayData = BatterySizeResults
     },
     async getCoordinatesByAddress() {
-      let osmReturn = (await this.$axios.post("/relay", {
-        url: "https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=" + encodeURIComponent(this.inputAddressSearchString),
-        method: "GET",
-        body: {}
-      })).data
+      if (this.isSearchingAddress) return
+      const address = this.inputAddressSearchString.trim()
+      this.addressSearchError = ""
+      this.adressData = {}
+      if (!address) {
+        this.addressSearchError = "Please enter an address."
+        return
+      }
 
+      this.isSearchingAddress = true
+      try {
+        const osmReturn = (await this.$axios.post("/relay", {
+          url: `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(address)}`,
+          method: "GET",
+          body: {}
+        }, { timeout: 20000 })).data
 
-      if (osmReturn.length == 0) {
-        this.adressData = "no_address"
-        console.log("Detected Wrong")
-      } else if (osmReturn[0]) {
-        this.adressData = osmReturn[0]
-        this.inputAddressSearchString = this.adressData.display_name
+        if (!Array.isArray(osmReturn)) throw new Error("Invalid address search response")
+        if (osmReturn.length === 0) {
+          this.adressData = "no_address"
+        } else {
+          const result = osmReturn[0]
+          if (!result || !result.lat || !result.lon || !result.display_name) {
+            throw new Error("Invalid address search result")
+          }
+          this.adressData = result
+          this.inputAddressSearchString = result.display_name
+        }
+      } catch {
+        this.addressSearchError = "Address search is currently unavailable. Please try again later."
+      } finally {
+        this.isSearchingAddress = false
       }
     },
     buildQueryString(params) {
