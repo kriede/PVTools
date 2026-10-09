@@ -33,6 +33,17 @@
       </button>
     </div>
 
+    <div v-if="selected?.gridFriendlyCharging" class="card p-4 text-sm">
+      <p class="font-medium">Netzdienliches Laden · 24-Stunden-Vorschau</p>
+      <p class="mt-1 text-muted">
+        Niedrige Börsenpreise als Überschusssignal (keine lokale Netzüberlastungsprognose):
+        {{ num(selected.gridFriendlyCharging.stressedHours) }} Stunden,
+        {{ kwh(selected.gridFriendlyCharging.feedInDuringStressKwh) }} Einspeisung in diesen Stunden.
+        {{ selected.gridFriendlyCharging.active ? 'PV-Ladung vorausschauend gesteuert.' : 'Referenz ohne Speicher.' }}
+        Ideale Prognosen; Stromtarif unverändert.
+      </p>
+    </div>
+
     <!-- recommendation + size picker -->
     <div class="card p-4 sm:p-5">
       <div class="flex flex-wrap items-start gap-3">

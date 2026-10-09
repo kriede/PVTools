@@ -1,6 +1,7 @@
 import { batteryPrice } from './batteryEconomics.js'
 import { energyFlow } from './energyFlow.js'
 import { buildLoads } from './loads/index.js'
+import { gridFriendlyStressHours, planChargingSocTarget } from './gridFriendlyCharging.js'
 
 /**
  * Simulates one year of energy flows for every battery size and derives the
@@ -99,6 +100,9 @@ export const simulateBatterySizes = ({
 }) => {
   let costSavingWithoutBattery
   const { inverterPower, feedInLimit } = resolveLimits(input)
+  // Validate every row before any dispatch, including baseline-only runs.
+  const stressedHours = gridFriendlyStressHours(powerGenAndConsumption, input)
+  const noBatteryFlows = []
 
   const batterySizesWithNoBattery = [1, ...batterySizes]
 
@@ -170,7 +174,19 @@ export const simulateBatterySizes = ({
         energyFlowObj.maxPowerLoadBattery = input.maxPowerLoadBattery
       if (feedInLimit < Infinity) energyFlowObj.maxPowerFeedIn = feedInLimit
 
+      if (stressedHours && size > 1) {
+        energyFlowObj.chargingSocTarget = planChargingSocTarget({
+          index: i,
+          noBatteryFlows,
+          stressedHours,
+          batterySocMin: energyFlowObj.batterySocMin,
+          batterySocMax: size,
+          batteryLoadEfficiency: energyFlowObj.batteryLoadEfficiency || 1,
+          maxPowerLoadBattery: input.maxPowerLoadBattery,
+        })
+      }
       const hourFlow = energyFlow(energyFlowObj)
+      if (stressedHours && size == 1) noBatteryFlows[i] = hourFlow
       newSoc = hourFlow.newBatterySoc
       return hourFlow
     })
@@ -341,6 +357,16 @@ export const simulateBatterySizes = ({
 
     return {
       size,
+      ...(stressedHours ? {
+        gridFriendlyCharging: {
+          active: size > 1,
+          stressedHours: stressedHours.filter(Boolean).length,
+          feedInDuringStressKwh: energyFlowData.reduce(
+            (sum, row, i) => sum + (stressedHours[i] ? row.feedInEnergyGrid : 0),
+            0,
+          ) / 1000,
+        },
+      } : {}),
       consumers,
       ...batteryUsage,
       balance: checkEnergyBalance(energyFlowData, startSoc),

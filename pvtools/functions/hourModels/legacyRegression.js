@@ -34,6 +34,7 @@ export const regressionCalc = ({
   batteryLoadEfficiency = 1,
   batterySocMin = 0,
   batterySocMax,
+  chargingSocTarget,
   maxPowerLoadBattery = 0,
   maxPowerFeedIn = 9999999,
 }) => {
@@ -53,6 +54,7 @@ export const regressionCalc = ({
       surplus: Math.max(staticPowerGeneration, 0),
       batterySoc,
       batterySocMax,
+      chargingSocTarget,
       batteryLoadEfficiency,
       maxBatteryLoad,
       maxPowerFeedIn,
@@ -152,6 +154,7 @@ export const regressionCalc = ({
     surplus: overflowPv,
     batterySoc: batterySoc - batteryDischarge,
     batterySocMax,
+    chargingSocTarget,
     batteryLoadEfficiency,
     maxBatteryLoad,
     maxPowerFeedIn,

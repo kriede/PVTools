@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { beforeEach, afterEach, expect, test, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ fetchGeneration: vi.fn(), buildConsumption: vi.fn() }))
+const mocks = vi.hoisted(() => ({ fetchGeneration: vi.fn(), buildConsumption: vi.fn(), loadDayAheadPrices: vi.fn() }))
+vi.mock('../lib/dayAheadPrices.js', () => ({ loadDayAheadPrices: mocks.loadDayAheadPrices }))
 vi.mock('../lib/api.js', () => ({
   fetchGeneration: mocks.fetchGeneration, geocode: vi.fn(),
   PVGIS_FIRST_YEAR: 2005, PVGIS_LAST_YEAR: 2023,
@@ -61,6 +62,7 @@ beforeEach(async () => {
   })
   vi.spyOn(console, 'error').mockImplementation(() => {})
   mocks.fetchGeneration.mockResolvedValue(generation())
+  mocks.loadDayAheadPrices.mockRejectedValue(new Error('Netzdienliches Laden: Preisdienst nicht erreichbar.'))
   mocks.buildConsumption.mockImplementation((analysis, year) => ({
     [`${year}0101:00`]: { P: analysis.values.get('source') },
   }))
@@ -78,6 +80,82 @@ test('HomePage wires ResultsView event, busy state and German summary', () => {
   expect(source).toContain('consumptionSummary.year')
   expect(source).toContain('zusätzlich zu YAML')
 })
+test('grid-friendly charging defaults off and stops before PVGIS when price retrieval fails', async () => {
+  expect(calculator.input.gridFriendlyChargingEnabled).toBe(false)
+  calculator.input.gridFriendlyChargingEnabled = true
+  await calculator.calculate()
+  expect(mocks.fetchGeneration).not.toHaveBeenCalled()
+  expect(workers).toHaveLength(0)
+  expect(calculator.error.value).toContain('Netzdienliches Laden')
+  expect(calculator.status.value).toBe('idle')
+})
+
+test('automatically downloads prices using the pre-await year snapshot without making results stale', async () => {
+  const { generateDayTimeOrder } = await import('./energyFlow.js')
+  const prices = Object.fromEntries(generateDayTimeOrder(2020).map(key => [key, 50]))
+  mocks.loadDayAheadPrices.mockResolvedValue({ year: 2020, prices })
+  calculator.input.gridFriendlyChargingEnabled = true
+  const pending = calculator.calculate()
+  await flush()
+  await flush()
+  expect(mocks.loadDayAheadPrices).toHaveBeenCalledWith(2020)
+  expect(workers[0].payload.input.gridFriendlyPrices['20200101:00']).toBe(50)
+  reply(workers[0])
+  await pending
+  expect(calculator.input.gridFriendlyPrices).toBeNull()
+  expect(calculator.isStale.value).toBe(false)
+})
+
+test('snapshots other inputs and year before awaiting automatic prices', async () => {
+  const { generateDayTimeOrder } = await import('./energyFlow.js')
+  const request = deferred()
+  mocks.loadDayAheadPrices.mockReturnValue(request.promise)
+  calculator.input.gridFriendlyChargingEnabled = true
+  const pending = calculator.calculate()
+  calculator.input.year = 2023
+  calculator.input.gridFriendlyPriceThreshold = -10
+  request.resolve({ year: 2020, prices: Object.fromEntries(generateDayTimeOrder(2020).map(key => [key, 50])) })
+  await flush()
+  await flush()
+  expect(workers[0].payload.input.year).toBe(2020)
+  expect(workers[0].payload.input.gridFriendlyPriceThreshold).toBe(0)
+  reply(workers[0])
+  await pending
+  expect(calculator.isStale.value).toBe(true)
+  expect(calculator.priceInfo.value).toBeNull()
+})
+
+test('successful manual refresh clears CSV but failed refresh preserves it', async () => {
+  const original = { '20200101:00': 123 }
+  calculator.input.gridFriendlyPrices = original
+  await expect(calculator.refreshPrices()).rejects.toThrow('Preisdienst')
+  expect(calculator.input.gridFriendlyPrices).toEqual(original)
+  expect(calculator.priceLoading.value).toBe(false)
+  mocks.loadDayAheadPrices.mockResolvedValue({ year: 2020, prices: {} })
+  await calculator.refreshPrices()
+  expect(mocks.loadDayAheadPrices).toHaveBeenLastCalledWith(2020, { force: true })
+  expect(calculator.input.gridFriendlyPrices).toBeNull()
+})
+
+test('snapshots day-ahead prices before awaiting generation', async () => {
+  const { generateDayTimeOrder } = await import('./energyFlow.js')
+  calculator.input.gridFriendlyChargingEnabled = true
+  calculator.input.gridFriendlyPrices = Object.fromEntries(generateDayTimeOrder(2020).map(key => [key, 50]))
+  const request = deferred()
+  mocks.fetchGeneration.mockReturnValue(request.promise)
+  const pending = calculator.calculate()
+  calculator.input.gridFriendlyPrices['20200101:00'] = -20
+  calculator.input.gridFriendlyPriceThreshold = -10
+  request.resolve(generation())
+  await flush()
+  expect(workers[0].payload.input.gridFriendlyPrices['20200101:00']).toBe(50)
+  expect(workers[0].payload.input.gridFriendlyPriceThreshold).toBe(0)
+  reply(workers[0])
+  await pending
+  expect(calculator.isStale.value).toBe(true)
+  expect(mocks.loadDayAheadPrices).not.toHaveBeenCalled()
+})
+
 test('migrates fork fixed costs to upstream base costs', () => {
   expect(calculator.input.batteryBaseCosts).toBe(1700)
   expect(calculator.input.batteryCostsFixed).toBeUndefined()

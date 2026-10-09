@@ -75,6 +75,7 @@ export const calcHourWithLoadDistribution = ({
   batteryLoadEfficiency = 1,
   batterySocMin = 0,
   batterySocMax,
+  chargingSocTarget,
   maxPowerLoadBattery = 0,
   maxPowerFeedIn = 9999999,
 }) => {
@@ -93,6 +94,7 @@ export const calcHourWithLoadDistribution = ({
       surplus: pv,
       batterySoc,
       batterySocMax,
+      chargingSocTarget,
       batteryLoadEfficiency,
       maxBatteryLoad,
       maxPowerFeedIn,
@@ -171,6 +173,7 @@ export const calcHourWithLoadDistribution = ({
     surplus: Math.max(pv - pvUsedDc, 0),
     batterySoc: batterySoc - batteryDischarge,
     batterySocMax,
+    chargingSocTarget,
     batteryLoadEfficiency,
     maxBatteryLoad,
     maxPowerFeedIn,

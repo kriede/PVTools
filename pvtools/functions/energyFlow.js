@@ -16,6 +16,8 @@ Parameters object:
     batterySoC: 3450 (watthours)
     batterySocMax: 5500 (watthours)
     batterySocMin: 100 (watthours)
+    chargingSocTarget (optional): charging-only SOC ceiling in Wh; 0 pauses,
+      undefined means unlimited, existing SOC and discharge are unaffected
     batteryEfficiency / batteryLoadEfficiency: 0.99 (99%)
     batteryUnloadEfficiency (optinal): 0.99 (99%)
     maxPowerGenerationInverter (optional): 2500 (watts)
@@ -51,6 +53,7 @@ const energyFlow = ({
   batterySoc,
   batterySocMax,
   batterySocMin,
+  chargingSocTarget,
   batteryEfficiency,
   batteryLoadEfficiency,
   batteryUnloadEfficiency,
@@ -122,6 +125,7 @@ const energyFlow = ({
     maxPowerFeedIn,
     batterySocMin,
     batterySocMax,
+    chargingSocTarget,
     batteryLoadEfficiency,
     batteryUnloadEfficiency,
   })

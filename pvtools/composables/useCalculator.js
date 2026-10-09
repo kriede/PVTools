@@ -18,6 +18,9 @@ import {
   getHourModel,
 } from '../functions/hourModels/index.js'
 import { resolveLimits } from '../functions/simulation.js'
+import { generateDayTimeOrder } from '../functions/energyFlow.js'
+import { gridFriendlyStressHours } from '../functions/gridFriendlyCharging.js'
+import { loadDayAheadPrices } from '../lib/dayAheadPrices.js'
 
 // the storage keys and shapes are kept from the previous version, so saved
 // inputs survive the update
@@ -76,6 +79,9 @@ export const DEFAULT_INPUT = {
   maxPowerGenerationInverter: 5000,
   maxPowerGenerationBattery: 0,
   maxPowerLoadBattery: 0,
+  gridFriendlyChargingEnabled: false,
+  gridFriendlyPriceThreshold: 0,
+  gridFriendlyPrices: null,
   // 'none' | 'watt' (maxPowerFeedIn) | 'percent' (of the PV power) | 'zero'
   feedInMode: 'none',
   maxPowerFeedIn: 0,
@@ -177,6 +183,8 @@ const fillMethod = ref('interpolate')
 
 const status = ref('idle') // 'idle' | 'geocoding' | 'fetching' | 'simulating'
 const error = ref(null)
+const priceInfo = shallowRef(null)
+const priceLoading = ref(false)
 const addressNotFound = ref(false)
 const results = shallowRef(null)
 // Derive from the same completed object: summaries and results commit together.
@@ -225,7 +233,7 @@ const missing = computed(() => {
 })
 
 const canCalculate = computed(
-  () => !missing.value.length && status.value === 'idle',
+  () => !missing.value.length && status.value === 'idle' && !priceLoading.value,
 )
 
 const signature = () =>
@@ -349,6 +357,19 @@ async function calculate() {
       ? JSON.parse(JSON.stringify(importedConsumption.value))
       : null
     const calcSignature = signature()
+    if (plainInput.gridFriendlyChargingEnabled) {
+      const rows = generateDayTimeOrder(plainInput.year).map(dayTime => ({ dayTime }))
+      // Threshold errors are input errors, not a reason to download prices.
+      gridFriendlyStressHours([], plainInput)
+      let validPrices = true
+      try { gridFriendlyStressHours(rows, plainInput) } catch { validPrices = false }
+      if (!validPrices) {
+        const loaded = await loadDayAheadPrices(plainInput.year)
+        plainInput.gridFriendlyPrices = loaded.prices
+        if (Number(input.year) === plainInput.year) priceInfo.value = loaded
+        gridFriendlyStressHours(rows, plainInput)
+      }
+    }
     const params = {
       roofs: plainInput.roofs.map(({ aspect, angle, peakpower }) => ({
         aspect, angle, peakpower,
@@ -426,7 +447,7 @@ async function calculate() {
       ? e.message.replace('Custom consumption:', 'Zusätzlicher Stromverbrauch:')
       : e.message
     error.value =
-      `${status.value === 'fetching'
+      `${status.value === 'fetching' && !message?.startsWith('Netzdienliches Laden:')
         ? `Die PV-Erzeugungsdaten konnten nicht von PVGIS abgerufen werden${upstream ? `: ${upstream}` : '. Bitte versuche es später erneut.'}`
         : `Die Berechnung ist fehlgeschlagen: ${message}`}${results.value ? ' Vorhandene Ergebnisse bleiben unverändert.' : ''}`
   } finally {
@@ -445,6 +466,23 @@ export async function changeComparisonYear(value) {
   ) return
   input.year = year
   await calculate()
+}
+
+async function refreshPrices() {
+  if (status.value !== 'idle' || priceLoading.value) return
+  const year = Number(input.year)
+  priceLoading.value = true
+  try {
+    const loaded = await loadDayAheadPrices(year, { force: true })
+    if (Number(input.year) === year) {
+      // Explicitly switch from an imported CSV back to the automatic source.
+      input.gridFriendlyPrices = null
+      priceInfo.value = loaded
+      lastSignature = null
+    }
+  } finally {
+    priceLoading.value = false
+  }
 }
 
 function reset() {
@@ -469,6 +507,9 @@ export function useCalculator() {
     limits,
     status,
     error,
+    priceInfo,
+    priceLoading,
+    refreshPrices,
     results,
     consumptionSummary,
     selectedSize,

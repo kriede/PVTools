@@ -51,11 +51,14 @@ export const chargeBattery = ({
   surplus,
   batterySoc,
   batterySocMax,
+  chargingSocTarget = Infinity,
   batteryLoadEfficiency,
   maxBatteryLoad,
   maxPowerFeedIn,
 }) => {
-  const freeCapacity = Math.max(batterySocMax - batterySoc, 0)
+  // A literal zero pauses charging; an SOC already above the target is not
+  // clipped or exported. Physical capacity and normal discharge stay intact.
+  const freeCapacity = Math.max(Math.min(batterySocMax, chargingSocTarget) - batterySoc, 0)
   const batteryCharge = Math.max(
     Math.min(surplus, freeCapacity / batteryLoadEfficiency, maxBatteryLoad),
     0,

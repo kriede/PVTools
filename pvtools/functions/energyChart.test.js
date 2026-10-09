@@ -31,7 +31,7 @@ function mount(props) {
 }
 
 test('chart components and results integration compile using Vue 3', () => {
-  for (const name of ['EnergyFlowChart', 'BarChart', 'results/ResultsView']) {
+  for (const name of ['EnergyFlowChart', 'BarChart', 'results/ResultsView', 'inputs/AdvancedSettings']) {
     const { descriptor, errors } = parse(source(name))
     expect(errors).toEqual([])
     const script = compileScript(descriptor, { id: name })

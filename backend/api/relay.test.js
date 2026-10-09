@@ -54,7 +54,9 @@ test('relay validates targets and completes both successful and failed requests'
             'ftp://re.jrc.ec.europa.eu/',
             'https://user:password@nominatim.openstreetmap.org/',
             'https://user@re.jrc.ec.europa.eu/',
-            'https://nominatim.openstreetmap.org:8080/'
+            'https://nominatim.openstreetmap.org:8080/',
+            'https://api.energy-charts.info/public_power',
+            'https://api.energy-charts.info.example.com/price'
         ]) {
             assert.equal((await invoke({ method: 'GET', url })).statusCode, 403);
         }
@@ -82,6 +84,17 @@ test('relay validates targets and completes both successful and failed requests'
         const response = await invoke({ method: 'GET', url: 'https://re.jrc.ec.europa.eu:443/api/v5_3/seriescalc' });
         assert.equal(response.statusCode, 202);
         assert.deepEqual(response.body, { pending: true });
+    });
+
+    await t.test('allows only the Energy-Charts price endpoint', async () => {
+        axios.get = async (url) => {
+            assert.equal(new URL(url).hostname, 'api.energy-charts.info');
+            assert.equal(new URL(url).pathname, '/price');
+            return { status: 200, data: { price: [-5], unit: 'EUR / MWh' } };
+        };
+        const response = await invoke({ method: 'GET', url: 'https://api.energy-charts.info/price?bzn=DE-LU&start=2023-01-01' });
+        assert.equal(response.statusCode, 200);
+        assert.deepEqual(response.body.price, [-5]);
     });
 
     await t.test('configures Nominatim email and User-Agent without affecting PVGIS', async () => {

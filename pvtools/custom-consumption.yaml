@@ -22,9 +22,9 @@ consumptions:
     power: 11000
     capacity: 50000
     # Charging schedule for the Opel Grandland electric: day of week: percentage of battery, start-time
-    starts: "monday:80%,20:00, wednesday:80%,10:00,friday:50%,08:00"
+    starts: "monday:80%,20:00,wednesday:80%,10:00,thursday:50%,08:00"
   - name: Opel Corsa electric
     type: electric-car
     power: 11000
     capacity: 50000
-    starts: "monday:60%,20:00,wednesday:50%,8:00,friday:60%,15:00"
+    starts: "sunday:60%,08:00,wednesday:50%,16:00,friday:40%,15:00"

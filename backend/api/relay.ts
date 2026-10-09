@@ -1,7 +1,7 @@
 import {RequestHandler} from "express";
 import axios from "axios";
 
-const ALLOWED_HOSTS = ["re.jrc.ec.europa.eu", "nominatim.openstreetmap.org"];
+const ALLOWED_HOSTS = ["re.jrc.ec.europa.eu", "nominatim.openstreetmap.org", "api.energy-charts.info"];
 
 export const relayAPIRequest: RequestHandler = async (req, res) => {
     if (req.body?.method !== "GET") {
@@ -21,6 +21,11 @@ export const relayAPIRequest: RequestHandler = async (req, res) => {
     if (url.protocol !== "https:" || url.username || url.password ||
         (url.port && url.port !== "443") ||
         !ALLOWED_HOSTS.includes(url.hostname)) {
+        res.sendStatus(403);
+        return;
+    }
+
+    if (url.hostname === "api.energy-charts.info" && url.pathname !== "/price") {
         res.sendStatus(403);
         return;
     }

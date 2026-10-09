@@ -77,6 +77,50 @@
         </p>
       </div>
 
+      <div class="space-y-3">
+        <label class="flex items-center gap-2 text-sm font-medium">
+          <input v-model="input.gridFriendlyChargingEnabled" type="checkbox" />
+          Netzdienliches Laden
+        </label>
+        <div v-if="input.gridFriendlyChargingEnabled" class="space-y-3">
+          <p class="text-xs text-muted">
+            Die Steuerung kennt Preise und PV-/Verbrauchsprognosen für maximal 24 Stunden im Voraus.
+            Sie hält vor günstigen Stunden Speicherplatz frei und lädt dann bevorzugt PV-Überschüsse.
+            Niedrige Preise sind nur eine Näherung für Netzüberschuss, kein Nachweis lokaler Netzüberlastung.
+            Keine Netzladung; Tarif und Einspeisevergütung bleiben unverändert. Prognosen werden ideal angenommen.
+          </p>
+          <NumberField v-model="input.gridFriendlyPriceThreshold" label="Überschusssignal bei Preis bis" unit="EUR/MWh" :step="1" />
+          <p class="text-xs text-muted">
+            Jahrespreise werden bei der Berechnung automatisch geladen und lokal im Browser gespeichert.
+            Quelle: <a href="https://energy-charts.info" target="_blank" rel="noopener noreferrer" class="underline">Energy-Charts / Fraunhofer ISE</a>,
+            Bundesnetzagentur / SMARD, <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer" class="underline">CC BY 4.0</a>.
+            Gebotszone DE-LU; ältere oder unvollständige Anbieterjahre benötigen einen CSV-Import.
+          </p>
+          <button type="button" class="btn-ghost" :disabled="priceLoading || status !== 'idle'" @click="reloadPrices">
+            {{ priceLoading ? 'Preise werden geladen …' : 'Preise neu laden (statt CSV)' }}
+          </button>
+          <p v-if="!input.gridFriendlyPrices && priceInfo?.year === Number(input.year)" class="text-xs text-muted">
+            {{ Object.keys(priceInfo.prices).length }} Stunden für {{ priceInfo.year }} geladen.
+            Abruf: {{ new Date(priceInfo.fetchedAt).toLocaleString('de-DE') }}. Folgeabrufe verwenden den Jahrescache.
+          </p>
+          <label class="block text-xs font-medium">
+            Alternativ: eigene Day-Ahead-Preise für das Vergleichsjahr (CSV)
+            <input type="file" accept=".csv,text/csv" class="input mt-1" @change="loadPrices" />
+          </label>
+          <p class="text-xs text-muted">
+            Spalten: dayTime,price — z.B. 20230101:00,-10. Preis in EUR/MWh; jede lokale Stunde einmal,
+            einschließlich 29. Februar in Schaltjahren. Sommerzeit: fehlende Stunde interpolieren,
+            doppelte Stunde mitteln. Keine UTC-Zeitstempel. Beim Wechsel des Vergleichsjahres neu importieren.
+          </p>
+          <p v-if="priceError" role="alert" class="text-xs text-grid">{{ priceError }}</p>
+          <p v-if="input.gridFriendlyPrices" class="text-xs text-muted">
+            {{ Object.keys(input.gridFriendlyPrices).length }} Preisstunden geladen
+            ({{ Object.keys(input.gridFriendlyPrices)[0]?.slice(0, 4) }}).
+          </p>
+          <p v-else-if="priceInfo?.year !== Number(input.year)" class="text-xs text-muted">Die Berechnung lädt die Preise automatisch; ohne vollständige Daten wird nicht simuliert.</p>
+        </div>
+      </div>
+
       <div class="grid grid-cols-2 gap-3">
         <NumberField
           v-model="input.systemloss"
@@ -264,12 +308,34 @@ import {
 
 import { useCalculator } from '../../composables/useCalculator.js'
 import { ratingLimits } from '../../functions/batteryEconomics.js'
+import { importDayAheadPrices } from '../../functions/priceImport.js'
 import { getHourModel, HOUR_MODELS } from '../../functions/hourModels/index.js'
 import { batteryLabel, num } from '../../lib/format.js'
 import NumberField from '../ui/NumberField.vue'
 import SegmentedControl from '../ui/SegmentedControl.vue'
 
-const { input, batterySizes, limits, reset } = useCalculator()
+const { input, batterySizes, limits, reset, status, priceInfo, priceLoading, refreshPrices } = useCalculator()
+
+const priceError = ref('')
+const reloadPrices = async () => {
+  priceError.value = ''
+  try { await refreshPrices() } catch (error) { priceError.value = error.message }
+}
+const loadPrices = async (event) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+  priceError.value = ''
+  try {
+    if (file.size > 2 * 1024 * 1024) throw new Error('Preisdatei darf höchstens 2 MB groß sein.')
+    const imported = importDayAheadPrices(await file.text())
+    if (imported.year !== Number(input.year)) throw new Error(`Preisjahr ${imported.year} stimmt nicht mit dem Vergleichsjahr ${input.year} überein.`)
+    input.gridFriendlyPrices = imported.prices
+  } catch (error) {
+    priceError.value = error.message
+  } finally {
+    event.target.value = ''
+  }
+}
 
 const newSize = ref(null)
 const validNewSize = computed(
