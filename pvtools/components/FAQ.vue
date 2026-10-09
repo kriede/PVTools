@@ -1,6 +1,6 @@
 <template>
     <div> 
-        <b-button v-b-toggle.collapseFaq>FAQs</b-button>
+        <b-button v-b-toggle.collapseFaq>Häufig gestellte Fragen</b-button>
         <b-collapse id="collapseFaq">
             <b-card v-for="realm in getRealms()" v-bind:key="realm">
                 <h3>{{realm}}</h3>
@@ -34,7 +34,7 @@
             text:"Anhand des eingetragenen Standortes werden bei PVGis die PV-Erzeugungsdaten je Stunde für ein Jahr abgeholt (Standard 2020) und mit den Verbrauchsdaten aus dem Lastprofil und verschiedene Batteriegrößen verrechnet."},
             {realm:"Allgemeines",
             title:"Mir fehlt eine Funktion",
-            text:"Wenn dir eine Funktion fehlt, dann melde dich über das <a href='https://www.akkudoktor.net/forum'>Forum von Andreas Schmitz</a> oder direkt auf der <a href='https://github.com/nick81nrw/PVTools/issues'>Quellcode Website</a>. Gerne nehmen wir dafür auch eine Untersützung entgegen ;-)"},
+            text:"Wenn dir eine Funktion fehlt, dann melde dich über das <a href='https://www.akkudoktor.net/forum'>Forum von Andreas Schmitz</a> oder direkt auf der <a href='https://github.com/nick81nrw/PVTools/issues'>Quellcode-Webseite</a>. Gerne nehmen wir dafür auch Unterstützung entgegen ;-)"},
             {realm:"Eingabefelder",
             title:"Adresse",
             text:"(Pflichtfeld) Hier kannst du eine Stadt, einer Postleitzahl oder eine Komplette Adresse eingeben. Der erste Treffer laut openstreetmap wird dann verwendet. Falls die Adresse nicht stimmen sollte, einfach mehr Informationen eingeben. Daraus wird der Breiten- und Längengrad ermittelt welche für die Berechnung benötigt wird."},
@@ -49,7 +49,7 @@
             text:"Nachdem ihr mindestens eine Ausrichtung eingetragen habt, könnt ihr diese mit dem Mülleimer wieder entfernen oder mit dem Stift bearbeiten."},
             {realm:"Eingabefelder",
             title:"Berechnen/Zurücksetzen/Erweiterte Einstellungen",
-            text:"Mit Berechnen wird die Berechnung ausgeführt. Der Button ist inaktiv, wenn du die Pflichfelder nicht gefüllt hast. Mit Zurücksetzen werden deine eingegebenen und damit gespeicherten Daten gelöscht. Unter Erweiterte Einstellungen findest du vorbelegte Parameter, die du anpassen kannst"},
+            text:"Mit Berechnen wird die Berechnung ausgeführt. Die Schaltfläche ist inaktiv, wenn du die Pflichtfelder nicht ausgefüllt hast. Mit Zurücksetzen werden deine eingegebenen und damit gespeicherten Daten gelöscht. Unter Erweiterte Einstellungen findest du vorbelegte Parameter, die du anpassen kannst."},
             {realm:"Erweitert",
             title:"Vergleichsjahr",
             text:"Für die PV Erzegung stehen bei PVGis mehrere Jahre zur Verfügung. 2020 ist das aktuellste Jahr. In dem Rechner wird immer nur ein Jahr berechnet, wenn man genauer rechnen möchte, solltest du die Ergebnisse von mehreren Jahren vergleichen."},

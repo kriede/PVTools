@@ -17,7 +17,7 @@
         </b-row>
         <b-row>
             <b-col>
-                <h2>Disclaimer:</h2>
+                <h2>Haftungsausschluss:</h2>
 
                 <p>Der Autor übernimmt keinerlei Gewähr für die Aktualität, Korrektheit, Vollständigkeit oder Qualität
                     der bereitgestellten Informationen. Haftungsansprüche gegen den Autor, welche sich auf Schäden
@@ -40,7 +40,7 @@
                     Erfahrung und eine Menge Planung.</p>
             </b-col>
         </b-row>
-        <NuxtLink to="/">Home</NuxtLink>
+        <NuxtLink to="/">Startseite</NuxtLink>
         <b-row>
             <b-col>
 
@@ -559,7 +559,7 @@
                 </ul>
             </b-col>
         </b-row>
-        <NuxtLink to="/">Home</NuxtLink>
+        <NuxtLink to="/">Startseite</NuxtLink>
     </b-container>
 
 </template>

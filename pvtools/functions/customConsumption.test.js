@@ -71,7 +71,7 @@ test('summaries include partial hours, leap-day schedules and empty configuratio
   expect(summarizeCustomConsumptions(entries, 2019)[0]).toMatchObject({ count: 0, hours: 0, energyKwh: 0 })
   expect(summarizeCustomConsumptions(entries, 2020)[0]).toMatchObject({ count: 1, hours: 24, energyKwh: 60 })
   expect(summarizeCustomConsumptions([], 2020)).toEqual([])
-  expect(() => summarizeCustomConsumptions([], 'invalid')).toThrow('invalid calculation year')
+  expect(() => summarizeCustomConsumptions([], 'invalid')).toThrow('Ungültiges Berechnungsjahr')
 })
 
 test('summaries count in-year starts but clip energy and hours at New Year', () => {
@@ -154,8 +154,8 @@ test('top-up power never exceeds a lower configured charger power', () => {
 })
 
 test('overlap validation includes the slower top-up phase and allows back-to-back events', () => {
-  expect(() => parse([car({ starts: 'monday:20%,20:00,monday:20%,21:00' })])).toThrow('overlapping')
-  expect(() => parse([car({ starts: 'saturday:20%,22:00,sunday:20%,00:00' })])).toThrow('overlapping')
+  expect(() => parse([car({ starts: 'monday:20%,20:00,monday:20%,21:00' })])).toThrow('überschneidende Ladevorgänge')
+  expect(() => parse([car({ starts: 'saturday:20%,22:00,sunday:20%,00:00' })])).toThrow('überschneidende Ladevorgänge')
   expect(() => parse([car({ capacity: 36000, starts: 'monday:20%,20:00,monday:20%,22:00' })])).not.toThrow()
 })
 
@@ -182,10 +182,34 @@ test.each([
 })
 
 test('rejects invalid YAML and accepts an empty consumer list', () => {
-  expect(() => parseCustomConsumptions('consumptions: [')).toThrow('invalid YAML')
-  expect(() => parseCustomConsumptions('consumptions: []\nconsumptions: []')).toThrow('invalid YAML')
-  expect(() => parseCustomConsumptions('consumptions: {}')).toThrow('must be a list')
+  expect(() => parseCustomConsumptions('consumptions: [')).toThrow('Ungültiges YAML')
+  expect(() => parseCustomConsumptions('consumptions: []\nconsumptions: []')).toThrow('Ungültiges YAML')
+  expect(() => parseCustomConsumptions('consumptions: {}')).toThrow('consumptions muss eine Liste sein')
   expect(parse([])).toEqual([])
+})
+
+test.each([
+  [heater({ name: '' }), 'Eintrag 1 benötigt einen Namen'],
+  [heater({ power: 0 }), 'Heater.power muss eine positive Zahl sein'],
+  [heater({ schedule: '25:00-26:00' }), 'Ungültige Uhrzeit: 25:00'],
+  [heater({ 'start-date': '2024-02-30' }), 'Ungültiges Datum: 2024-02-30'],
+  [car({ starts: 'montag:20%,20:00' }), 'mit englischem Wochentagsnamen'],
+  [car({ starts: 'monday:101%,20:00' }), 'Die Prozentangabe muss größer als 0 und höchstens 100 sein']
+])('uses German validation messages while preserving configuration identifiers %#', (entry, message) => {
+  expect(() => parse([entry])).toThrow(message)
+  expect(() => parse([entry])).toThrow('Custom consumption:')
+})
+
+test('YAML syntax errors use German diagnostics with a source position', () => {
+  expect(() => parseCustomConsumptions('consumptions: [')).toThrow(
+    'Custom consumption: Ungültiges YAML in Zeile 1, Spalte 16: Bitte Syntax, doppelte Schlüssel und unzulässige Aliase prüfen'
+  )
+})
+
+test('missing household hours use a German diagnostic', () => {
+  expect(() => addCustomConsumptions({}, parse([heater()]), 2020)).toThrow(
+    'Custom consumption: Im Haushaltsprofil fehlt der Zeitpunkt 20200401:05'
+  )
 })
 
 test('household calendar preserves January 1 and works independently of local timezone', () => {

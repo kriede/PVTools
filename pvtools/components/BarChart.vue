@@ -14,9 +14,9 @@
   
   <script>
   import { Bar } from 'vue-chartjs/legacy'
-  import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js'
+  import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, LineElement, PointElement, LineController, CategoryScale, LinearScale } from 'chart.js'
   
-  ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
+  ChartJS.register(Title, Tooltip, Legend, BarElement, LineElement, PointElement, LineController, CategoryScale, LinearScale)
   
   export default {
     name: 'BarChart',
@@ -65,6 +65,14 @@
       datasets: {
       type: Array,
       default: []
+      },
+      axisTitle: {
+        type: String,
+        default: ''
+      },
+      showBatteryAxis: {
+        type: Boolean,
+        default: false
       }
     },
     computed: {
@@ -75,6 +83,14 @@
             }
         }
     },
+    watch: {
+      axisTitle(value) {
+        this.chartOptions.scales.y.title = { display: Boolean(value), text: value }
+      },
+      showBatteryAxis(value) {
+        this.chartOptions.scales.soc.display = value
+      }
+    },
     data() {
       return {
         // chartData: {
@@ -83,12 +99,29 @@
         // },
         chartOptions: {
           responsive: true,
+          locale: 'de-DE',
+          onClick: (event, elements) => {
+            const bar = elements.find(element => this.datasets[element.datasetIndex].type !== 'line')
+            if (bar) this.$emit('bar-click', bar.index)
+          },
           scales: {
             x: {
                 stacked: true,
             },
             y: {
                 stacked: true,
+              title: { display: Boolean(this.axisTitle), text: this.axisTitle },
+            },
+            soc: {
+              type: 'linear',
+              position: 'right',
+              display: this.showBatteryAxis,
+              min: 0,
+              max: 100,
+              stacked: false,
+              grid: { drawOnChartArea: false },
+              ticks: { callback: value => `${value} %` },
+              title: { display: true, text: 'Batterie-Füllstand (%)' }
             }
             }
         }

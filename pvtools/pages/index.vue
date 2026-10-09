@@ -6,7 +6,7 @@
       </b-col>
       <b-col>
         <iframe frameborder="0" scrolling="no" marginheight="0" marginwidth="0" width="200" height="100"
-          type="text/html"
+          type="text/html" title="Video-Anleitung zu PVTools"
           src="https://www.youtube.com/embed/FKSDynkXchY?autoplay=0&fs=1&iv_load_policy=3&showinfo=0&rel=0&cc_load_policy=0&start=0&end=0"></iframe>
       </b-col>
       <b-col align-v="baseline" cols="auto">
@@ -33,12 +33,12 @@
               <b-input-group append="Straße, PLZ Stadt">
                 <b-form-input v-model="inputAddressSearchString"
                   placeholder="z.B. 50667 Köln" v-b-tooltip.hover
-                  title="Enter an address, then click the search button."
+                  title="Gib eine Adresse ein und klicke anschließend auf die Suche."
                   @keydown.enter.prevent="getCoordinatesByAddress" />
                 </b-input-group>
                 <b-input-group-append>
                   <b-button variant="info" :disabled="isSearchingAddress" @click="getCoordinatesByAddress">
-                    {{ isSearchingAddress ? 'Searching…' : 'Suche nach Adresse' }}
+                    {{ isSearchingAddress ? 'Suche läuft…' : 'Suche nach Adresse' }}
                   </b-button>
                 </b-input-group-append>
             </b-form-group>
@@ -54,7 +54,7 @@
 
             </b-form-group>
             <b-alert v-else-if="adressData == 'no_address'" variant="danger" show>
-              Die eingegebende Adresse konnte nicht gefunden werden. Bitte versuchen Sie es erneut.
+              Die eingegebene Adresse konnte nicht gefunden werden. Bitte versuche es erneut.
             </b-alert>
             <b-form-group label="Jährlicher Stromverbrauch:">
               <b-input-group append="kWh">
@@ -90,7 +90,7 @@
           <b-form @submit="addRoof" @submit.stop.prevent >
             <b-card bg-variant="light">
               <b-form-group label="Ausrichtung:">
-                <b-input-group append="° Grad Azimuth">
+                <b-input-group append="° Grad Azimut">
                   <b-form-input v-model.number="roofInput.aspect" type="number" min="-180" max="180" required v-b-tooltip.hover
                     title="0 = Süden, 90 = Westen, -90 = Osten" />
                 </b-input-group>
@@ -98,7 +98,7 @@
               <b-form-group label="Neigung:">
                 <b-input-group append="° Grad">
                   <b-form-input v-model.number="roofInput.angle" type="number" min="0" max="90" required v-b-tooltip.hover
-                    title="0 = waargerecht, 90 = senkrecht" />
+                    title="0 = waagerecht, 90 = senkrecht" />
                 </b-input-group>
               </b-form-group>
               <b-form-group label="Installierte Leistung">
@@ -120,14 +120,14 @@
               <b-list-group-item button :v-b-toggle="'roof' + roof.aspect + roof.angle + roof.peakpower">
                 Ausrichtung {{ roof.aspect }}° - Neigung: {{ roof.angle }}° - {{ roof.peakpower }} Wp
                 <b-button-group>
-                  <b-button variant="primary"
+                  <b-button variant="primary" aria-label="Ausrichtung bearbeiten"
                     @click="roofInput.aspect = roof.aspect
                                           roofInput.angle = roof.angle
                     roofInput.peakpower = roof.peakpower
                     input.roofs = input.roofs.filter(roofEntry => !(roof.aspect == roofEntry.aspect && roof.angle == roofEntry.angle && roof.peakpower == roofEntry.peakpower)) ">
                     <font-awesome-icon icon="pen" />
                   </b-button>
-                  <b-button variant="danger"
+                  <b-button variant="danger" aria-label="Ausrichtung entfernen"
                     @click="input.roofs = input.roofs.filter(roofEntry => !(roof.aspect == roofEntry.aspect && roof.angle == roofEntry.angle && roof.peakpower == roofEntry.peakpower))">
                     <font-awesome-icon icon="trash" />
                   </b-button>
@@ -164,7 +164,11 @@
               <b-input-group append="Wh">
                 <b-form-tags input-id="tags-basic" v-model="inputBatterySizes" :tag-validator="tagValidator"
                   v-b-tooltip.hover title='Zwischen 0,2 und 200 kWh'
-                  :input-attrs="{ 'aria-describedby': 'tags-validation-help' }"></b-form-tags>
+                  placeholder="Speichergröße hinzufügen …" add-button-text="Hinzufügen"
+                  tag-remove-label="Speichergröße entfernen" tag-removed-label="Speichergröße entfernt"
+                  invalid-tag-text="Ungültige Speichergröße(n)" duplicate-tag-text="Doppelte Speichergröße(n)"
+                  limit-tags-text="Maximale Anzahl an Speichergrößen erreicht"
+                  :input-attrs="{ 'aria-label': 'Speichergrößen in Wh' }"></b-form-tags>
               </b-input-group>
             </b-form-group>
             <b-form-group label="Speicherkosten einmalig:">
@@ -173,7 +177,7 @@
               </b-input-group>
             </b-form-group>
             <b-form-group label="Vergleichsjahr:">
-              <b-form-select v-model="input.year" :options="years"></b-form-select>
+              <b-form-select v-model="input.year" :options="years" :disabled="isCalculating"></b-form-select>
             </b-form-group>
             <b-form-group label="Systemverluste PV:">
               <b-input-group append="%">
@@ -185,13 +189,13 @@
                 <b-form-input v-model.number="input.batterySocMinPercent" type="number" min="0" max="100" />
               </b-input-group>
             </b-form-group>
-            <b-form-group label="Ladeeffizenz Speicher (Laden / Entladen):">
+            <b-form-group label="Speichereffizienz (Laden / Entladen):">
               <b-input-group append="%">
                 <b-form-input v-model.number="input.batteryLoadEfficiency" type="number" min="0" max="100" />
                 <b-form-input v-model.number="input.batteryUnloadEfficiency" type="number" min="0" max="100" />
               </b-input-group>
             </b-form-group>
-            <b-form-group label="Maximalleistung Wechelrichter (0 = keine Prüfung):">
+            <b-form-group label="Maximalleistung Wechselrichter (0 = keine Prüfung):">
               <b-input-group append="W">
                 <b-form-input v-model.number="input.maxPowerGenerationInverter" type="number" min="0" max="100000" />
               </b-input-group>
@@ -236,7 +240,10 @@
         </b-collapse>
       </b-col>
     </b-row>
-    <b-overlay :show="isCalculating" rounded="sm">
+    <b-overlay :show="isCalculating" rounded="sm" :aria-busy="isCalculating ? 'true' : 'false'">
+      <template #overlay>
+        <b-spinner label="Berechnung läuft …" />
+      </template>
       <b-row>
         <b-col>
           <div id="chartContainer">
@@ -244,7 +251,7 @@
               :datasets="[
                 { data: displayData.map(item => item.selfUseRate), yAxisID: 'y1', label: 'Eigenverbrauchsquote', borderColor: 'blue' },
                 { data: displayData.map(item => item.selfSufficiencyRate), yAxisID: 'y1', label: 'Autarkiegrad', borderColor: 'green' },
-                { data: displayData.map(item => item.amortization), yAxisID: 'y2', label: 'Amortization', borderColor: 'red', }
+                { data: displayData.map(item => item.amortization), yAxisID: 'y2', label: 'Amortisation', borderColor: 'red', }
                 ]" />
           </div>
 
@@ -275,12 +282,12 @@
                 striped hover
                 :items="[row.item]"
                 :fields="[
-                  { key: 'generationYear', label: 'PV Erzeugung', formatter: (val) => (val).toFixed(1) + ' kWh' },
-                  { key: 'consumptionYear', label: 'Stromverbrauch', formatter: (val) => (val).toFixed(1) + ' kWh' },
-                  { key: 'consumptionGrid', label: 'Netzbezug', formatter: (val) => (val).toFixed(1) + ' kWh' },
-                  { key: 'missedFeedInPowerGrid', label: 'Fehlende Netzeinspeisung', formatter: (val) => (val).toFixed(1) + ' kWh' },
-                  { key: 'missedInverterPower', label: 'Fehlende Erzeugung Wechelrichter', formatter: (val) => (val).toFixed(1) + ' kWh' },
-                  { key: 'missedBatteryPower', label: 'Fehlende Erzeugung Speicher', formatter: (val) => (val).toFixed(1) + ' kWh' },
+                  { key: 'generationYear', label: 'PV-Erzeugung', formatter: (val) => `${formatNumber(val, 1)} kWh` },
+                  { key: 'consumptionYear', label: 'Stromverbrauch', formatter: (val) => `${formatNumber(val, 1)} kWh` },
+                  { key: 'consumptionGrid', label: 'Netzbezug', formatter: (val) => `${formatNumber(val, 1)} kWh` },
+                  { key: 'missedFeedInPowerGrid', label: 'Fehlende Netzeinspeisung', formatter: (val) => `${formatNumber(val, 1)} kWh` },
+                  { key: 'missedInverterPower', label: 'Fehlende Erzeugung Wechselrichter', formatter: (val) => `${formatNumber(val, 1)} kWh` },
+                  { key: 'missedBatteryPower', label: 'Fehlende Erzeugung Speicher', formatter: (val) => `${formatNumber(val, 1)} kWh` },
                 ]"
                 small
                 responsive="sm"
@@ -290,44 +297,36 @@
                 striped hover
                 :items="roofsData"
                 :fields="[
-                  { key: 'aspect', label: 'Ausrichtung', formatter: (val) => (val).toFixed(1) + '°' },
-                  { key: 'angle', label: 'Neigung', formatter: (val) => (val).toFixed(1) + '°' },
-                  { key: 'peakpower', label: 'Leistung', formatter: (val) => (val/1000).toFixed(1) + ' kWp' },
-                  { key: 'generationYear', label: 'PV-Ertrag', formatter: (val) => (val).toFixed(1) + ' kWh' },
+                  { key: 'aspect', label: 'Ausrichtung', formatter: (val) => `${formatNumber(val, 1)}°` },
+                  { key: 'angle', label: 'Neigung', formatter: (val) => `${formatNumber(val, 1)}°` },
+                  { key: 'peakpower', label: 'Leistung', formatter: (val) => `${formatNumber(val / 1000, 1)} kWp` },
+                  { key: 'generationYear', label: 'PV-Ertrag', formatter: (val) => `${formatNumber(val, 1)} kWh` },
                 ]"
                 small
                 responsive="sm"
               />
           </b-card>
           <b-card>
-            <h4>Monatsverlauf</h4>
-            <BarChart :datasets="[
-                                  {data: row.item.monthlyData.map(i=>i.feedInPowerGrid*-1/1000),label: 'Einspeisung', backgroundColor: 'orange', stack: 'Stack 0'},
-                                  {data: row.item.monthlyData.map(i=>i.selfUsagePowerPv/1000),label:'Selbstverbrauch PV', backgroundColor: 'green', stack: 'Stack 0'},
-                                  {data: row.item.monthlyData.map(i=>i.selfUsagePowerBattery/1000),label:'Selbstverbrauch Speicher', backgroundColor: 'blue', stack: 'Stack 0'},
-                                  {data: row.item.monthlyData.map(i=>i.consumptionGrid/1000),label:'Netzverbrauch', backgroundColor: 'red', stack: 'Stack 0'},
-                                  // {data: row.item.monthlyData.map(i=>(i.consumptionGrid+i.selfUsagePowerBattery+i.selfUsagePowerPv)/1000),label:'Gesamtverbrauch', backgroundColor: 'black', stack: 'Stack 2'},
-                                ]"
-                      :labels="['Jan','Feb','Mar','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']"
-                      />
+            <EnergyFlowChart :energy-flow="row.item.energyFlow" :battery-capacity="row.item.size"
+              :years="years" :busy="isCalculating" @year-change="changeComparisonYear" />
 
           </b-card>
         </template>
       </b-table>
       <footer v-if="displayData.length > 0"
               class="mt-3 mb-4" aria-labelledby="custom-consumption-summary-heading">
-        <h5 id="custom-consumption-summary-heading">Annual consumption — {{ customConsumptionYear }}</h5>
+        <h5 id="custom-consumption-summary-heading">Jährlicher Stromverbrauch — {{ customConsumptionYear }}</h5>
         <ul class="mb-1">
-          <li><strong>Household:</strong> {{ formatSummaryNumber(householdConsumptionKwh) }} kWh</li>
+          <li><strong>Haushalt:</strong> {{ formatSummaryNumber(householdConsumptionKwh) }} kWh</li>
           <li v-for="(item, index) in customConsumptionSummary" :key="index">
             <strong>{{ item.name }}:</strong>
-            {{ formatSummaryNumber(item.count) }} {{ item.type === 'electric-car' ? 'charging sessions' : 'days' }}<template v-if="item.type === 'heating'">,
-              {{ formatSummaryNumber(item.hours) }} hours</template>,
+            {{ formatSummaryNumber(item.count) }} {{ item.type === 'electric-car' ? 'Ladevorgänge' : 'Tage' }}<template v-if="item.type === 'heating'">,
+              {{ formatSummaryNumber(item.hours) }} Stunden</template>,
             {{ formatSummaryNumber(item.energyKwh) }} kWh
           </li>
         </ul>
-        <p class="mb-1"><strong>Total consumption: {{ formatSummaryNumber(totalConsumptionKwh) }} kWh</strong></p>
-        <small class="text-muted">Full-year load profile. Counts include starts within this year; hours and energy include carry-in from the previous year.</small>
+        <p class="mb-1"><strong>Gesamtverbrauch: {{ formatSummaryNumber(totalConsumptionKwh) }} kWh</strong></p>
+        <small class="text-muted">Lastprofil für das ganze Jahr. Gezählt werden die Starts innerhalb dieses Jahres; Stunden und Energie berücksichtigen auch Überträge aus dem Vorjahr.</small>
       </footer>
     </b-overlay>
     <FAQ />
@@ -337,7 +336,7 @@
 
 <script>
 import Chart from '../components/Chart'
-import BarChart from '../components/BarChart'
+import EnergyFlowChart from '../components/EnergyFlowChart'
 import FAQ from '../components/FAQ'
 // import axios from "axios";
 import {
@@ -351,11 +350,16 @@ import { factorFunction, PROFILEBASE, SLPH0 } from "@/functions/SLP";
 import customConsumptionYaml from '!!raw-loader!../custom-consumption.yaml';
 import { parseCustomConsumptions, addCustomConsumptions, summarizeCustomConsumptions } from '@/functions/customConsumption';
 
+const formatNumber = (value, digits = 2) => Number(value).toLocaleString('de-DE', {
+  minimumFractionDigits: digits,
+  maximumFractionDigits: digits
+})
+
 export default {
   name: 'IndexPage',
   components: {
     Chart,
-    BarChart,
+    EnergyFlowChart,
     FAQ
   },
   data() {
@@ -367,15 +371,15 @@ export default {
       totalConsumptionKwh: 0,
       returnedData: {},
       tableFields:[
-        { key: 'size', label: 'Speichergröße', formatter: (val) => (val/1000).toFixed(1) + " kWh" },
-        { key: 'selfUsedPower', label: 'Selbstgenutzter Strom / Jahr', formatter: (val) => val.toFixed(2) + " kWh" },
-        { key: 'fedInPower', label: 'Eingespeister Strom / Jahr', formatter: (val) => val.toFixed(2) + " kWh" },
-        { key: 'selfUseRate', label: 'Eigenverbrauchsquote', formatter: (val) => val.toFixed(2) + " %" },
-        { key: 'selfSufficiencyRate', label: 'Autarkiegrad', formatter: (val) => val.toFixed(2) + " %" },
-        { key: 'costSavingsBattery', label: 'Ersparnis / Jahr durch Akku', formatter: (val) => val.toFixed(2) + " €"  },
-        { key: 'batteryAmortization', label: 'Amortisation nur Speicher', formatter: (val) => val.toFixed(2) + " Jahre" },
-        { key: 'costSavings', label: 'Ersparnis / Jahr Anlage', formatter: (val) => val.toFixed(2) + " €" },
-        { key: 'amortization', label: 'Amortisation Anlage', formatter: (val) => val.toFixed(2) + " Jahre"  },
+        { key: 'size', label: 'Speichergröße', formatter: (val) => `${formatNumber(val / 1000, 1)} kWh` },
+        { key: 'selfUsedPower', label: 'Selbstgenutzter Strom / Jahr', formatter: (val) => `${formatNumber(val)} kWh` },
+        { key: 'fedInPower', label: 'Eingespeister Strom / Jahr', formatter: (val) => `${formatNumber(val)} kWh` },
+        { key: 'selfUseRate', label: 'Eigenverbrauchsquote', formatter: (val) => `${formatNumber(val)} %` },
+        { key: 'selfSufficiencyRate', label: 'Autarkiegrad', formatter: (val) => `${formatNumber(val)} %` },
+        { key: 'costSavingsBattery', label: 'Ersparnis / Jahr durch Akku', formatter: (val) => `${formatNumber(val)} €`  },
+        { key: 'batteryAmortization', label: 'Amortisation nur Speicher', formatter: (val) => `${formatNumber(val)} Jahre` },
+        { key: 'costSavings', label: 'Ersparnis / Jahr Anlage', formatter: (val) => `${formatNumber(val)} €` },
+        { key: 'amortization', label: 'Amortisation Anlage', formatter: (val) => `${formatNumber(val)} Jahre`  },
         { key: 'show_details', label: 'Weitere Details'  },
       ],
       inputBatterySizes: [],
@@ -445,63 +449,70 @@ export default {
   },
   methods: {
 
+    formatNumber,
     formatSummaryNumber(value) {
-      return value.toLocaleString('en-GB', { maximumFractionDigits: 1 })
+      return value.toLocaleString('de-DE', { maximumFractionDigits: 1 })
+    },
+    async changeComparisonYear(value) {
+      const year = Number(value)
+      if (this.isCalculating || !this.years.some(option => Number(option.value) === year)) return
+      this.input.year = year
+      await this.generateData()
     },
     async generateData() {
       if (this.isCalculating) return
       this.calculationError = ""
       if (!this.adressData.lat || !this.adressData.lon || this.input.roofs.length === 0) {
-        this.calculationError = "Please select an address and add at least one PV orientation."
+        this.calculationError = "Bitte wähle eine Adresse und füge mindestens eine PV-Ausrichtung hinzu."
         return
       }
       this.isCalculating = true
       try {
         await this.calculateData()
       } catch (error) {
-        this.roofsData = []
-        this.displayData = []
-        this.customConsumptionSummary = []
-        this.customConsumptionYear = null
-        this.householdConsumptionKwh = 0
-        this.totalConsumptionKwh = 0
         this.calculationError = error.message && error.message.startsWith('Custom consumption:')
-          ? error.message
-          : "Calculation failed. Check that the backend is running and try again. The PVGIS service may be temporarily unavailable."
+          ? error.message.replace('Custom consumption:', 'Zusätzlicher Stromverbrauch:')
+          : "Die Berechnung ist fehlgeschlagen. Prüfe, ob der Hintergrunddienst läuft, und versuche es erneut. Der PVGIS-Dienst ist möglicherweise vorübergehend nicht verfügbar. Vorhandene Ergebnisse bleiben unverändert."
       } finally {
         this.isCalculating = false
       }
     },
     async calculateData() {
-      if (localStorage /* function to detect if localstorage is supported*/) {
-        localStorage.setItem('storedInput', JSON.stringify(this.input))
-        localStorage.setItem('storedInputAddressSearchString', this.inputAddressSearchString)
-        localStorage.setItem('storedSizes', JSON.stringify(this.batterySizes))
-        localStorage.setItem('storedAddress', JSON.stringify(this.adressData))
+      // Every request and calculation uses the same inputs, even if the form changes while awaiting PVGIS.
+      const input = JSON.parse(JSON.stringify(this.input))
+      input.year = Number(input.year)
+      const address = { ...this.adressData }
+      const addressSearchString = this.inputAddressSearchString
+      const batterySizes = [...this.batterySizes]
+      const expandedSizes = new Set(this.displayData.filter(row => row._showDetails).map(row => row.size))
+      const roofsData = []
+      if (!this.years.some(option => Number(option.value) === input.year)) {
+        throw new Error('Das Vergleichsjahr wird nicht unterstützt.')
       }
-
-      this.inputBatterySizes = [...this.batterySizes]
+      if (localStorage /* function to detect if localstorage is supported*/) {
+        localStorage.setItem('storedInput', JSON.stringify(input))
+        localStorage.setItem('storedInputAddressSearchString', addressSearchString)
+        localStorage.setItem('storedSizes', JSON.stringify(batterySizes))
+        localStorage.setItem('storedAddress', JSON.stringify(address))
+      }
 
       let now = performance.now()
 
-      this.isCalculating = true
-      this.roofsData = []
-
       const customConsumptions = parseCustomConsumptions(customConsumptionYaml)
-      const customConsumptionYear = Number(this.input.year)
+      const customConsumptionYear = input.year
       const customConsumptionSummary = summarizeCustomConsumptions(customConsumptions, customConsumptionYear)
 
-      const generationData = await Promise.all(this.input.roofs.map(roof => {
+      const generationData = await Promise.all(input.roofs.map((roof, index) => {
         return this.$axios.post("/relay", {
           url: this.buildQueryString({
             aspect: roof.aspect,
             angle: roof.angle,
-            lat: this.adressData.lat,
-            lon: this.adressData.lon,
+            lat: address.lat,
+            lon: address.lon,
             peakpower: roof.peakpower / 1000,
-            loss: this.input.systemloss,
-            startyear: this.input.year,
-            endyear: this.input.year
+            loss: input.systemloss,
+            startyear: input.year,
+            endyear: input.year
 
           }),
           method: "GET",
@@ -510,11 +521,15 @@ export default {
           .then(response => response.data)
           .then(data => {
             if (!data || !data.outputs || !Array.isArray(data.outputs.hourly) || data.outputs.hourly.length === 0) {
-              throw new Error("PVGIS returned no hourly generation data")
+              throw new Error("PVGIS hat keine stündlichen Erzeugungsdaten geliefert.")
             }
             const normData = normalizeHourlyRadiation(data.outputs.hourly)
+            const timestamps = Object.keys(normData)
+            if (timestamps.length === 0 || timestamps.some(time => Number(time.slice(0, 4)) !== input.year)) {
+              throw new Error('Die PVGIS-Erzeugungsdaten passen nicht zum angeforderten Vergleichsjahr.')
+            }
             const generationYear = Object.values(normData).reduce((prev, curr) => prev + curr.P,0) / 1000
-            this.roofsData.push({...roof, generationYear })
+            roofsData[index] = { ...roof, generationYear }
             return normData
           })
       }))
@@ -522,16 +537,19 @@ export default {
 
       const mergedPower = mergePowerGeneration(generationData)
 
-      const householdConsumption = calculateConsumption({ year: this.input.year, consumptionYear: this.input.yearlyConsumption, profile: SLPH0, profileBase: PROFILEBASE, factorFunction })
-      const consumption = addCustomConsumptions(householdConsumption, customConsumptions, this.input.year)
+      const householdConsumption = calculateConsumption({ year: input.year, consumptionYear: input.yearlyConsumption, profile: SLPH0, profileBase: PROFILEBASE, factorFunction })
+      const consumption = addCustomConsumptions(householdConsumption, customConsumptions, input.year)
       const householdConsumptionKwh = Object.values(householdConsumption).reduce((sum, hour) => sum + hour.P, 0) / 1000
       const totalConsumptionKwh = Object.values(consumption).reduce((sum, hour) => sum + hour.P, 0) / 1000
-      const powerGenAndConsumption = generateDayTimeValues({ consumption, powerGeneration: mergedPower, year: this.input.year })
+      const powerGenAndConsumption = generateDayTimeValues({ consumption, powerGeneration: mergedPower, year: input.year })
+      if (powerGenAndConsumption.length === 0) {
+        throw new Error('Für das Vergleichsjahr sind keine passenden stündlichen Daten vorhanden.')
+      }
 
       let costSavingWithoutBattery
 
 
-      const batterySizesWithNoBattery = [1, ...this.batterySizes]
+      const batterySizesWithNoBattery = [1, ...batterySizes]
 
       let BatterySizeResults = batterySizesWithNoBattery.map(size => {
         let newSoc = 100
@@ -544,15 +562,15 @@ export default {
             powerConsumption: genConsumption.consumption,
             batterySoc: newSoc,
             batterySocMax: size,
-            batterySocMin: size * this.input.batterySocMinPercent / 100,
-            batteryLoadEfficiency: this.input.batteryLoadEfficiency / 100,
-            batteryUnloadEfficiency: this.input.batteryUnloadEfficiency / 100,
+            batterySocMin: size * input.batterySocMinPercent / 100,
+            batteryLoadEfficiency: input.batteryLoadEfficiency / 100,
+            batteryUnloadEfficiency: input.batteryUnloadEfficiency / 100,
             dayTime: genConsumption.dayTime
           }
-          if (this.input.maxPowerGenerationInverter && this.input.maxPowerGenerationInverter > 0) energyFlowObj.maxPowerGenerationInverter = this.input.maxPowerGenerationInverter
-          if (this.input.maxPowerGenerationBattery && this.input.maxPowerGenerationBattery > 0) energyFlowObj.maxPowerGenerationBattery = this.input.maxPowerGenerationBattery
-          if (this.input.maxPowerLoadBattery && this.input.maxPowerLoadBattery > 0) energyFlowObj.maxPowerLoadBattery = this.input.maxPowerLoadBattery
-          if (this.input.maxPowerFeedIn && this.input.maxPowerFeedIn > 0) energyFlowObj.maxPowerFeedIn = this.input.maxPowerFeedIn
+          if (input.maxPowerGenerationInverter && input.maxPowerGenerationInverter > 0) energyFlowObj.maxPowerGenerationInverter = input.maxPowerGenerationInverter
+          if (input.maxPowerGenerationBattery && input.maxPowerGenerationBattery > 0) energyFlowObj.maxPowerGenerationBattery = input.maxPowerGenerationBattery
+          if (input.maxPowerLoadBattery && input.maxPowerLoadBattery > 0) energyFlowObj.maxPowerLoadBattery = input.maxPowerLoadBattery
+          if (input.maxPowerFeedIn && input.maxPowerFeedIn > 0) energyFlowObj.maxPowerFeedIn = input.maxPowerFeedIn
 
           const hourFlow = energyFlow(energyFlowObj)
           newSoc = hourFlow.newBatterySoc
@@ -569,11 +587,11 @@ export default {
         const fedInPower = energyFlowData.reduce((prev, curr) => curr.feedInPowerGrid + prev, 0) / 1000
         const selfSufficiencyRate = consumptionYear > 0 ? selfUsedPower / consumptionYear * 100 : 0 // Autarkiegrad
         const selfUseRate = selfUsedPower / generationYear * 100 // Eigenverbrauchsquote
-        const costSavings = (selfUsedPower * this.input.consumptionCosts + fedInPower * this.input.feedInCompensation)
+        const costSavings = (selfUsedPower * input.consumptionCosts + fedInPower * input.feedInCompensation)
         if (size == 1) costSavingWithoutBattery = costSavings;
-        const amortization = (this.input.installationCostsWithoutBattery + (size == 1 ? 0 : this.input.batteryCostsFixed + this.input.batteryCostsPerKwh * (size / 1000))) / costSavings
+        const amortization = (input.installationCostsWithoutBattery + (size == 1 ? 0 : input.batteryCostsFixed + input.batteryCostsPerKwh * (size / 1000))) / costSavings
         const costSavingsBattery = size == 1 ? 0 : costSavings - costSavingWithoutBattery
-        const batteryAmortization = size == 1 ? 0 : this.input.batteryCostsFixed + this.input.batteryCostsPerKwh * (size / 1000) / costSavingsBattery
+        const batteryAmortization = size == 1 ? 0 : input.batteryCostsFixed + input.batteryCostsPerKwh * (size / 1000) / costSavingsBattery
 
         const monthlyDataObj = energyFlowData.reduce((prev, curr) => {
           const month = parseInt(curr.dayTime.slice(4, 6))
@@ -606,25 +624,25 @@ export default {
           return prev
         }, {})
 
-        const yearlyData = new Array(this.input.amortizationYears).fill(undefined).map((val,i)=>i).map((val) => {
+        const yearlyData = new Array(input.amortizationYears).fill(undefined).map((val,i)=>i).map((val) => {
 
-            const conYear = consumptionYear * (100+ (this.input.linearConsumptionChange * val)) /100
-            // var suRate = selfUseRate * (100 + this.input.linearSelfUseRateChange * val)/100
-            var suRate = selfUseRate * ((this.input.linearSelfUseRateChange / 100+1)**val)
+          const conYear = consumptionYear * (100+ (input.linearConsumptionChange * val)) /100
+          // var suRate = selfUseRate * (100 + input.linearSelfUseRateChange * val)/100
+          var suRate = selfUseRate * ((input.linearSelfUseRateChange / 100+1)**val)
             const suPower = generationYear*suRate/100
-            const conCosts = this.input.consumptionCosts * ((100 + this.input.linearConsumptionCostsChange*val)/100)
+          const conCosts = input.consumptionCosts * ((100 + input.linearConsumptionCostsChange*val)/100)
             const fedIn = generationYear - suPower
 
             return {
               year: val,
-              generationYear: generationYear * (100 - (this.input.linearDegrationModules * val)) /100,
+              generationYear: generationYear * (100 - (input.linearDegrationModules * val)) /100,
               consumptionYear: conYear,
               selfUsedPower: suPower,
               fedInPower: fedIn,
               selfSufficiencyRate: suPower/conYear*100,
               selfUsedRate: selfUseRate,
               consumptionCosts: conCosts,
-              costSavings: (suPower * conCosts + fedIn * this.input.feedInCompensation),
+              costSavings: (suPower * conCosts + fedIn * input.feedInCompensation),
             }
 
         })
@@ -638,6 +656,7 @@ export default {
 
         return {
           size,
+          _showDetails: expandedSizes.has(size),
           energyFlow: energyFlowData,
           generationYear,
           consumptionYear,
@@ -660,7 +679,7 @@ export default {
       })
 
       this.timeNeeded = performance.now() - now
-      this.isCalculating = false
+      this.roofsData = roofsData
       this.displayData = BatterySizeResults
       this.customConsumptionSummary = customConsumptionSummary
       this.customConsumptionYear = customConsumptionYear
@@ -673,7 +692,7 @@ export default {
       this.addressSearchError = ""
       this.adressData = {}
       if (!address) {
-        this.addressSearchError = "Please enter an address."
+        this.addressSearchError = "Bitte gib eine Adresse ein."
         return
       }
 
@@ -685,19 +704,19 @@ export default {
           body: {}
         }, { timeout: 20000 })).data
 
-        if (!Array.isArray(osmReturn)) throw new Error("Invalid address search response")
+        if (!Array.isArray(osmReturn)) throw new Error("Ungültige Antwort bei der Adresssuche")
         if (osmReturn.length === 0) {
           this.adressData = "no_address"
         } else {
           const result = osmReturn[0]
           if (!result || !result.lat || !result.lon || !result.display_name) {
-            throw new Error("Invalid address search result")
+            throw new Error("Ungültiges Ergebnis bei der Adresssuche")
           }
           this.adressData = result
           this.inputAddressSearchString = result.display_name
         }
       } catch {
-        this.addressSearchError = "Address search is currently unavailable. Please try again later."
+        this.addressSearchError = "Die Adresssuche ist derzeit nicht verfügbar. Bitte versuche es später erneut."
       } finally {
         this.isSearchingAddress = false
       }

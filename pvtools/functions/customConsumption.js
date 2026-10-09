@@ -6,64 +6,68 @@ const EV_TOP_UP_POWER = 3600
 const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
 function fail(message) {
+  // Keep this prefix stable: the parent form uses it to recognize these errors.
   throw new Error(`Custom consumption: ${message}`)
 }
 
 function positive(value, field) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) fail(`${field} must be a positive number`)
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) fail(`${field} muss eine positive Zahl sein`)
   return value
 }
 
 function minutes(value, allowMidnight = false) {
-  if (typeof value !== 'string') fail('time must be H:MM or HH:MM')
+  if (typeof value !== 'string') fail('Die Uhrzeit muss im Format H:MM oder HH:MM angegeben werden')
   const parts = value.trim().split(':')
-  if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[0]) || !/^\d{2}$/.test(parts[1])) fail(`invalid time ${value}`)
+  if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[0]) || !/^\d{2}$/.test(parts[1])) fail(`Ungültige Uhrzeit: ${value}`)
   const hour = Number(parts[0])
   const minute = Number(parts[1])
   if (allowMidnight && hour === 24 && minute === 0) return 1440
-  if (hour > 23 || minute > 59) fail(`invalid time ${value}`)
+  if (hour > 23 || minute > 59) fail(`Ungültige Uhrzeit: ${value}`)
   return hour * 60 + minute
 }
 
 function monthDay(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) fail('dates must be quoted YYYY-MM-DD strings')
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) fail('Datumsangaben müssen als Zeichenfolgen in Anführungszeichen im Format JJJJ-MM-TT angegeben werden')
   const [year, month, day] = value.split('-').map(Number)
   const date = new Date(Date.UTC(year, month - 1, day))
-  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) fail(`invalid date ${value}`)
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) fail(`Ungültiges Datum: ${value}`)
   return month * 100 + day
 }
 
 function parseCustomConsumptions(text) {
   let config
-  try { config = parse(text, { uniqueKeys: true, maxAliasCount: 0 }) } catch (error) { fail(`invalid YAML: ${error.message}`) }
-  if (!config || !Array.isArray(config.consumptions)) fail('consumptions must be a list')
+  try { config = parse(text, { uniqueKeys: true, maxAliasCount: 0 }) } catch (error) {
+    const position = error.linePos && error.linePos[0]
+    fail(`Ungültiges YAML${position ? ` in Zeile ${position.line}, Spalte ${position.col}` : ''}: Bitte Syntax, doppelte Schlüssel und unzulässige Aliase prüfen`)
+  }
+  if (!config || !Array.isArray(config.consumptions)) fail('consumptions muss eine Liste sein')
   return config.consumptions.map((entry, index) => {
-    if (!entry || typeof entry.name !== 'string' || !entry.name.trim()) fail(`entry ${index + 1} requires a name`)
+    if (!entry || typeof entry.name !== 'string' || !entry.name.trim()) fail(`Eintrag ${index + 1} benötigt einen Namen`)
     const power = positive(entry.power, `${entry.name}.power`)
     if (entry.type === 'heating') {
-      if (typeof entry.schedule !== 'string') fail(`${entry.name} requires schedule`)
+      if (typeof entry.schedule !== 'string') fail(`${entry.name} benötigt einen Zeitplan (schedule)`)
       const parts = entry.schedule.split('-')
-      if (parts.length !== 2) fail(`${entry.name} requires a start-end schedule`)
+      if (parts.length !== 2) fail(`${entry.name} benötigt einen Zeitplan im Format Start-Ende`)
       const start = minutes(parts[0])
       const end = minutes(parts[1], true)
-      if (start === end) fail(`${entry.name} has an empty schedule; use 00:00-24:00 for a full day`)
+      if (start === end) fail(`${entry.name} hat einen leeren Zeitplan; für einen ganzen Tag bitte 00:00-24:00 verwenden`)
       return { name: entry.name, type: entry.type, power, start, end,
         startDate: monthDay(entry['start-date']), endDate: monthDay(entry['end-date']) }
     }
-    if (entry.type !== 'electric-car') fail(`${entry.name} requires type heating or electric-car`)
+    if (entry.type !== 'electric-car') fail(`${entry.name} benötigt den Typ (type) heating oder electric-car`)
     const capacity = positive(entry.capacity, `${entry.name}.capacity`)
-    if (typeof entry.starts !== 'string' || !entry.starts.trim()) fail(`${entry.name} requires starts`)
+    if (typeof entry.starts !== 'string' || !entry.starts.trim()) fail(`${entry.name} benötigt Ladebeginn-Angaben (starts)`)
     const parts = entry.starts.split(',').map(part => part.trim())
-    if (parts.length % 2) fail(`${entry.name} has an incomplete charging event`)
+    if (parts.length % 2) fail(`${entry.name} hat einen unvollständigen Ladevorgang`)
     const events = []
     for (let i = 0; i < parts.length; i += 2) {
       const pair = parts[i].split(':')
       const day = weekdays.indexOf(pair[0])
-      if (pair.length !== 2 || day < 0 || !pair[1].endsWith('%')) fail(`${entry.name} has an invalid weekday:percentage% event`)
+      if (pair.length !== 2 || day < 0 || !pair[1].endsWith('%')) fail(`${entry.name} hat einen ungültigen Ladevorgang; erwartet wird Wochentag:Prozent% mit englischem Wochentagsnamen`)
       const percentText = pair[1].slice(0, -1)
-      if (!/^\d+(\.\d+)?$/.test(percentText)) fail(`${entry.name} has an invalid percentage`)
+      if (!/^\d+(\.\d+)?$/.test(percentText)) fail(`${entry.name} hat eine ungültige Prozentangabe`)
       const percent = Number(percentText)
-      if (percent <= 0 || percent > 100) fail(`${entry.name} percentage must be greater than 0 and at most 100`)
+      if (percent <= 0 || percent > 100) fail(`${entry.name}: Die Prozentangabe muss größer als 0 und höchstens 100 sein`)
       const start = minutes(parts[i + 1])
       // Replenish the missing percentage to 100%, switching power at 80% SOC.
       const fastEnergy = capacity * Math.max(percent - 20, 0) / 100
@@ -79,7 +83,7 @@ function parseCustomConsumptions(text) {
     events.forEach((event, i) => {
       const next = events[(i + 1) % events.length]
       const gap = next.day * DAY + next.start * 60000 + (i === events.length - 1 ? 7 * DAY : 0) - event.day * DAY - event.start * 60000
-      if (event.duration > gap) fail(`${entry.name} has overlapping charging events`)
+      if (event.duration > gap) fail(`${entry.name} hat sich überschneidende Ladevorgänge`)
     })
     return { name: entry.name, type: entry.type, power, events }
   })
@@ -92,7 +96,7 @@ function timeKey(time) {
 
 function calculationYear(year) {
   year = Number(year)
-  if (!Number.isInteger(year) || year < 1000 || year > 9998) fail('invalid calculation year')
+  if (!Number.isInteger(year) || year < 1000 || year > 9998) fail('Ungültiges Berechnungsjahr')
   return year
 }
 
@@ -140,7 +144,7 @@ function addCustomConsumptions(baseProfile, entries, year) {
     end = Math.min(end, yearEnd)
     for (let hour = Math.floor(start / HOUR) * HOUR; hour < end; hour += HOUR) {
       const key = timeKey(hour)
-      if (!profile[key]) fail(`household profile is missing ${key}`)
+      if (!profile[key]) fail(`Im Haushaltsprofil fehlt der Zeitpunkt ${key}`)
       profile[key].P += power * (Math.min(end, hour + HOUR) - Math.max(start, hour)) / HOUR
     }
   })
