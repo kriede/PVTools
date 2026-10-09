@@ -40,8 +40,20 @@
             }
         },
         {
+            "label": "PVTools: Open Browser",
+            "type": "process",
+            "command": "cmd.exe",
+            "args": ["/d", "/c", "start", "", "http://localhost:3000"],
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "dedicated",
+                "close": true
+            }
+        },
+        {
             "label": "PVTools: Start All",
-            "dependsOn": ["PVTools: Backend", "PVTools: Frontend"],
+            "dependsOn": ["PVTools: Backend", "PVTools: Frontend", "PVTools: Open Browser"],
             "dependsOrder": "parallel",
             "problemMatcher": [],
             "group": {
