@@ -1,0 +1,53 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "PVTools: Backend",
+            "type": "shell",
+            "command": "npm install && npm start",
+            "options": {
+                "cwd": "${workspaceFolder}/backend",
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": ["/d", "/c"]
+                }
+            },
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "pvtools"
+            }
+        },
+        {
+            "label": "PVTools: Frontend",
+            "type": "shell",
+            "command": "npm install && npm run dev",
+            "options": {
+                "cwd": "${workspaceFolder}/pvtools",
+                "shell": {
+                    "executable": "cmd.exe",
+                    "args": ["/d", "/c"]
+                }
+            },
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "pvtools"
+            }
+        },
+        {
+            "label": "PVTools: Start All",
+            "dependsOn": ["PVTools: Backend", "PVTools: Frontend"],
+            "dependsOrder": "parallel",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}
