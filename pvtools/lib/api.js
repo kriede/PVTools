@@ -13,20 +13,36 @@ export const PVGIS_LAST_YEAR = 2023
  * CORS and the user's IP address is not passed on to third parties.
  */
 export async function relayRequest(url) {
-  const response = await fetch(`${__API_BASE_URL__}/relay`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, method: 'GET', body: {} }),
+  const controller = new AbortController()
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error('Zeitüberschreitung beim Datenabruf. Bitte erneut versuchen.'))
+      controller.abort()
+    }, 30000)
   })
-  const data = await response.json().catch(() => null)
-  if (!response.ok) {
-    const error = new Error(
-      `Request failed with status code ${response.status}`,
-    )
-    error.response = { status: response.status, data }
-    throw error
+  try {
+    const request = (async () => {
+      const response = await fetch(`${__API_BASE_URL__}/relay`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, method: 'GET', body: {} }),
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        const error = new Error(
+          `Request failed with status code ${response.status}`,
+        )
+        error.response = { status: response.status, data }
+        throw error
+      }
+      return data
+    })()
+    return await Promise.race([timeout, request])
+  } finally {
+    clearTimeout(timer)
   }
-  return data
 }
 
 /** Returns the first Nominatim result for the query or null */

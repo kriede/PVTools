@@ -33,11 +33,17 @@
         </div>
       </div>
     </div>
+    <p v-if="feedInDominates" role="alert" class="mb-2 text-sm text-grid">
+      Die Netzeinspeisung ist mehr als hundertmal so groß wie der gesamte Verbrauch.
+      Dadurch sind die Verbrauchsbalken kaum sichtbar. Bitte die Dachleistungen prüfen:
+      Die Eingabe erfolgt in kWp, nicht in Wp.
+    </p>
+    <small class="block text-muted mb-2">Netzeinspeisung wird unterhalb der Nulllinie dargestellt; PV-Eigenverbrauch, Batterie-Eigenverbrauch und Netzbezug oberhalb.</small>
     <small v-if="mode === 'week'" class="block text-muted mb-2">Kalenderwochen laufen von Montag bis Sonntag. Jeder Balken entspricht einer Stunde. Leere Stunden liegen außerhalb der Simulation oder enthalten keine Daten.</small>
-    <small v-if="batteryCapacity > 1" class="block text-muted mb-2">Der Batterie-Füllstand zeigt den Stand am Ende der Stunde, des Tages oder des Monats.</small>
+    <small v-if="showBatterySoc" class="block text-muted mb-2">Der Batterie-Füllstand zeigt den Stand am Ende der Stunde.</small>
     <BarChart :labels="buckets.map(bucket => bucket.label)" :datasets="datasets"
           :axis-title="mode === 'year' ? 'Energie (kWh pro Monat)' : mode === 'month' ? 'Energie (kWh pro Tag)' : 'Energie (kWh pro Stunde)'"
-          :show-battery-axis="batteryCapacity > 1" @bar-click="drillDown" />
+          :show-battery-axis="showBatterySoc" @bar-click="drillDown" />
   </section>
 </template>
 
@@ -63,6 +69,7 @@ export default {
     }
   },
   computed: {
+    showBatterySoc() { return this.batteryCapacity > 1 && (this.mode === 'week' || this.mode === 'day') },
     index() { return indexEnergyFlow(this.energyFlow) },
     simulationYear() { return this.index.dates.length ? Number(this.index.dates[0].slice(0, 4)) : null },
     yearOptions() { return this.years.length ? this.years : [this.simulationYear].filter(Boolean) },
@@ -81,6 +88,16 @@ export default {
       })
     },
     buckets() { return this.selectedDate ? chartBuckets(this.index, this.mode, this.selectedDate) : [] },
+    feedInDominates() {
+      const total = this.buckets.reduce((sum, bucket) => {
+        if (bucket.values) {
+          sum.feedIn += bucket.values.feedInEnergyGrid
+          sum.consumption += bucket.values.selfUsedEnergyPV + bucket.values.selfUsedEnergyBattery + bucket.values.gridUsedEnergy
+        }
+        return sum
+      }, { feedIn: 0, consumption: 0 })
+      return total.consumption > 0 && total.feedIn > total.consumption * 100
+    },
     datasets() {
       const energy = [
         ['feedInEnergyGrid', 'Netzeinspeisung', ENERGY_COLORS.feedin, -1],
@@ -91,7 +108,7 @@ export default {
         label, backgroundColor, stack: 'energy', yAxisID: 'y',
         data: this.buckets.map(bucket => bucket.values ? bucket.values[field] * sign / 1000 : null)
       }))
-      if (this.batteryCapacity > 1) energy.push({
+      if (this.showBatterySoc) energy.push({
         type: 'line', label: 'Batterie-Füllstand (%)', yAxisID: 'soc',
         borderColor: '#6f42c1', backgroundColor: '#6f42c1', borderWidth: 2,
         pointRadius: this.mode === 'week' ? 0 : 2, fill: false, spanGaps: false, order: -1,

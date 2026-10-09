@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { fetchGeneration, PVGIS_FIRST_YEAR, PVGIS_LAST_YEAR } from '../lib/api.js'
+import { fetchGeneration, relayRequest, PVGIS_FIRST_YEAR, PVGIS_LAST_YEAR } from '../lib/api.js'
 
 const roofs = [{ aspect: 0, angle: 30, peakpower: 1000 }]
 const params = { roofs, lat: 50, lon: 6, loss: 12, year: 2019 }
@@ -9,8 +9,30 @@ beforeEach(() => {
   vi.stubGlobal('__API_BASE_URL__', '/api')
   vi.stubGlobal('fetch', vi.fn())
 })
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
 const serve = (data) => fetch.mockResolvedValue({ ok: true, json: async () => data })
+
+test.each(['request', 'body'])('times out a stalled %s and aborts the network request', async (stage) => {
+  vi.useFakeTimers()
+  const stalled = new Promise(() => {})
+  fetch.mockReturnValue(stage === 'request' ? stalled : Promise.resolve({
+    ok: true, json: () => stalled,
+  }))
+  const pending = relayRequest('https://example.test')
+  const rejected = expect(pending).rejects.toThrow('Zeitüberschreitung')
+  await vi.advanceTimersByTimeAsync(30000)
+  await rejected
+  expect(fetch.mock.calls[0][1].signal.aborted).toBe(true)
+  expect(vi.getTimerCount()).toBe(0)
+})
+
+test('successful requests clear their timeout', async () => {
+  vi.useFakeTimers()
+  serve({ ok: true })
+  await expect(relayRequest('https://example.test')).resolves.toEqual({ ok: true })
+  expect(vi.getTimerCount()).toBe(0)
+  expect(fetch.mock.calls[0][1].signal.aborted).toBe(false)
+})
 
 test('requests matching years and kWp, accepts UTC New Year before timezone shifting', async () => {
   serve(response([row(), row('20191231:2310', 0), row('20190701:1210', 2000)]))

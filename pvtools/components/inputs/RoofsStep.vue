@@ -24,6 +24,7 @@
           </div>
           <div class="num text-xs text-muted">
             Neigung {{ roof.angle }}° · {{ num(roof.peakpower / 1000, 2) }} kWp
+            ({{ num(roof.peakpower, 0) }} Wp)
           </div>
         </div>
         <button
@@ -59,6 +60,12 @@
       >
         ändern
       </button>
+    </p>
+
+    <p v-if="input.roofs.some(roof => roof.peakpower >= 1000000)"
+      role="alert" class="mb-4 text-sm text-grid">
+      Sehr hohe Dachleistung: Bitte die Einheit prüfen. Die Eingabe erfolgt in kWp,
+      nicht in Wp — für 12.000 Wp bitte 12 kWp eingeben.
     </p>
 
     <form
@@ -108,6 +115,7 @@
           label="Leistung"
           unit="kWp"
           :factor="0.001"
+          hint="Eingabe in kWp: 12 kWp entsprechen 12.000 Wp. In der alten Oberfläche wurde Wp eingegeben."
           :min="0.1"
           :step="0.1"
         />

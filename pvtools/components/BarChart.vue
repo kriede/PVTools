@@ -6,7 +6,7 @@
       :data="chartData"
       :options="chartOptions"
       :dataset-id-key="datasetIdKey"
-      :plugins="plugins"
+      :plugins="chartPlugins"
       :width="width"
       :height="height"
       aria-label="Energiefluss nach Zeitraum"
@@ -23,6 +23,7 @@ import {
 } from 'chart.js'
 import { useTheme } from '../composables/useTheme.js'
 import { axis, baseOptions, themeColors } from '../lib/chartTheme.js'
+import { batteryZeroAlignment } from '../lib/batteryAxis.js'
 
 ChartJS.register(Title, Tooltip, Legend, BarElement, LineElement, PointElement,
   LineController, CategoryScale, LinearScale)
@@ -43,6 +44,7 @@ const props = defineProps({
 const emit = defineEmits(['bar-click'])
 const { isDark } = useTheme()
 const chartData = computed(() => ({ labels: props.labels, datasets: props.datasets }))
+const chartPlugins = computed(() => [...props.plugins, batteryZeroAlignment])
 const chartOptions = computed(() => {
   void isDark.value
   const colors = themeColors()
@@ -57,11 +59,13 @@ const chartOptions = computed(() => {
       x: axis(colors, { stacked: true, grid: { display: false } }),
       y: axis(colors, {
         stacked: true,
+        suggestedMax: props.showBatteryAxis ? 1 : undefined,
         title: { display: Boolean(props.axisTitle), text: props.axisTitle, color: colors.muted },
       }),
       soc: axis(colors, {
         type: 'linear', position: 'right', display: props.showBatteryAxis,
         min: 0, max: 100, stacked: false,
+        afterBuildTicks: scale => { scale.ticks = [0, 20, 40, 60, 80, 100].map(value => ({ value })) },
         grid: { drawOnChartArea: false },
         ticks: { ...axis(colors).ticks, callback: value => `${value} %` },
         title: { display: true, text: 'Batterie-Füllstand (%)', color: colors.muted },

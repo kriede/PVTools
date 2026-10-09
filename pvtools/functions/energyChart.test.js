@@ -48,6 +48,20 @@ function row(dayTime, value = 1000) {
   return { dayTime, feedInEnergyGrid: value, selfUsedEnergyPV: value * 2, selfUsedEnergyBattery: value * 3, gridUsedEnergy: value * 4 }
 }
 
+test('warns when excessive feed-in hides consumption without altering energy data', async () => {
+  const normal = row('20230101:12')
+  const { vm, state, unmount } = mount({ energyFlow: [normal], batteryCapacity: 10000 })
+  expect(vm.feedInDominates).toBe(false)
+  state.energyFlow = [{ ...normal, feedInEnergyGrid: 12000000 }]
+  await nextTick()
+  expect(vm.feedInDominates).toBe(true)
+  expect(vm.datasets.slice(0, 4).map(dataset => dataset.data[0])).toEqual([-12000, 2, 3, 4])
+  state.energyFlow = []
+  await nextTick()
+  expect(vm.feedInDominates).toBe(false)
+  unmount()
+})
+
 test('ISO weeks handle week-year boundaries and week 53', () => {
   expect(isoWeek('2021-01-01')).toEqual({ key: '2020-W53', start: '2020-12-28' })
   expect(isoWeek('2019-12-30')).toEqual({ key: '2020-W01', start: '2019-12-30' })
@@ -162,6 +176,24 @@ test('SOC uses end-of-period state rather than sum, including unordered inputs',
   expect(chartBuckets(index, 'month', '2020-02-29')[28].soc).toBe(500)
   expect(chartBuckets(index, 'year', '2020-02-29')[0].soc).toBe(500)
   expect(chartBuckets(index, 'day', '2020-02-29')[1].soc).toBeNull()
+})
+
+test('SOC line, axis and hint appear only in week/day views with a battery', () => {
+  const wrapper = mount({ batteryCapacity: 1000, energyFlow: [{ ...row('20200229:23'), newBatterySoc: 500 }] })
+  for (const mode of ['year', 'month', 'week', 'day', 'month', 'year']) {
+    wrapper.vm.mode = mode
+    const visible = mode === 'week' || mode === 'day'
+    expect(wrapper.vm.showBatterySoc).toBe(visible)
+    expect(wrapper.vm.datasets.some(dataset => dataset.yAxisID === 'soc')).toBe(visible)
+  }
+  wrapper.unmount()
+  const withoutBattery = mount({ batteryCapacity: 1, energyFlow: [row('20200229:23')] })
+  withoutBattery.vm.mode = 'day'
+  expect(withoutBattery.vm.showBatterySoc).toBe(false)
+  expect(withoutBattery.vm.datasets).toHaveLength(4)
+  withoutBattery.unmount()
+  expect(source('EnergyFlowChart')).toContain(':show-battery-axis="showBatterySoc"')
+  expect(source('EnergyFlowChart')).toContain('v-if="showBatterySoc"')
 })
 
 test('chart drills down to matching week/day, drills out and emits year requests', () => {

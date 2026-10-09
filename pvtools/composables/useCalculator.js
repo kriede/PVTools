@@ -294,15 +294,34 @@ const runWorker = (payload) =>
       new URL('../functions/simulation.worker.js', import.meta.url),
       { type: 'module' },
     )
-    worker.onmessage = ({ data }) => {
+    let settled = false
+    const finish = (error, data) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      worker.onmessage = null
+      worker.onerror = null
+      worker.onmessageerror = null
       worker.terminate()
-      data.error ? reject(new Error(data.error)) : resolve(data)
+      error ? reject(error) : resolve(data)
+    }
+    const timer = setTimeout(() => {
+      finish(new Error('Die Simulation wurde nach 120 Sekunden wegen Zeitüberschreitung abgebrochen. Bitte versuche es erneut.'))
+    }, 120000)
+    worker.onmessage = ({ data }) => {
+      finish(data.error ? new Error(data.error) : null, data)
     }
     worker.onerror = (event) => {
-      worker.terminate()
-      reject(new Error(event.message || 'Simulation fehlgeschlagen'))
+      finish(new Error(event.message || 'Simulation fehlgeschlagen'))
     }
-    worker.postMessage(payload)
+    worker.onmessageerror = () => {
+      finish(new Error('Die Ergebnisse der Simulation konnten nicht gelesen werden.'))
+    }
+    try {
+      worker.postMessage(payload)
+    } catch (error) {
+      finish(error)
+    }
   })
 
 async function calculate() {

@@ -69,7 +69,7 @@ beforeEach(async () => {
   calculator.input.roofs = [{ aspect: 0, angle: 30, peakpower: 1000 }]
   calculator.batterySizes.value = [5000, 10000]
 })
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 test('HomePage wires ResultsView event, busy state and German summary', () => {
   const source = readFileSync(new URL('../pages/HomePage.vue', import.meta.url), 'utf8')
@@ -239,3 +239,98 @@ test.each(['fetch', 'worker', 'balance', 'summary', 'empty'])('failure (%s) reta
   expect(calculator.error.value).toContain('Vorhandene Ergebnisse bleiben unverändert')
   expect(calculator.status.value).toBe('idle')
 })
+
+test('stalled worker times out after 120 seconds, retains results and ignores late messages', async () => {
+  vi.useFakeTimers()
+  await complete()
+  calculator.selectedSize.value = 10000
+  const previous = calculator.results.value
+  const pending = calculator.changeComparisonYear(2019)
+  await flush()
+  const worker = workers.at(-1)
+  const lateMessage = worker.onmessage
+  expect(calculator.status.value).toBe('simulating')
+  expect(vi.getTimerCount()).toBe(1)
+  await vi.advanceTimersByTimeAsync(119999)
+  expect(calculator.status.value).toBe('simulating')
+  expect(worker.terminate).not.toHaveBeenCalled()
+  await vi.advanceTimersByTimeAsync(1)
+  await pending
+  expect(worker.terminate).toHaveBeenCalledTimes(1)
+  expect(worker.onmessage).toBeNull()
+  expect(worker.onerror).toBeNull()
+  expect(worker.onmessageerror).toBeNull()
+  expect(vi.getTimerCount()).toBe(0)
+  expect(calculator.status.value).toBe('idle')
+  expect(calculator.canCalculate.value).toBe(true)
+  expect(calculator.results.value).toBe(previous)
+  expect(calculator.consumptionSummary.value).toBe(previous.consumptionSummary)
+  expect(calculator.selectedSize.value).toBe(10000)
+  expect(calculator.error.value).toContain('120 Sekunden wegen Zeitüberschreitung')
+  expect(calculator.error.value).toContain('Vorhandene Ergebnisse bleiben unverändert')
+  const timeoutError = calculator.error.value
+  reply({ payload: worker.payload, onmessage: lateMessage })
+  await flush()
+  expect(calculator.results.value).toBe(previous)
+  expect(calculator.error.value).toBe(timeoutError)
+  expect(calculator.status.value).toBe('idle')
+  expect(worker.terminate).toHaveBeenCalledTimes(1)
+  await complete()
+  const recovered = calculator.results.value
+  reply({ payload: worker.payload, onmessage: lateMessage })
+  await flush()
+  expect(calculator.results.value).toBe(recovered)
+  expect(calculator.results.value.meta.year).toBe(2019)
+  expect(calculator.error.value).toBeNull()
+  expect(vi.getTimerCount()).toBe(0)
+})
+
+test.each(['success', 'worker error', 'error reply', 'message decode error', 'postMessage throw'])(
+  'worker cleanup clears timeout and handlers on %s', async (exit) => {
+    vi.useFakeTimers()
+    await complete()
+    calculator.selectedSize.value = 10000
+    const previous = calculator.results.value
+    if (exit === 'postMessage throw') {
+      vi.spyOn(Worker.prototype, 'postMessage').mockImplementation(() => {
+        throw new Error('postMessage failed')
+      })
+    }
+    const pending = calculator.changeComparisonYear(2019)
+    await flush()
+    const worker = workers.at(-1)
+    if (exit !== 'postMessage throw') {
+      expect(vi.getTimerCount()).toBe(1)
+      if (exit === 'success') reply(worker)
+      if (exit === 'worker error') worker.onerror({ message: 'worker failed' })
+      if (exit === 'error reply') reply(worker, { error: 'simulation failed' })
+      if (exit === 'message decode error') worker.onmessageerror({})
+    }
+    await pending
+    expect(worker.terminate).toHaveBeenCalledTimes(1)
+    expect(worker.onmessage).toBeNull()
+    expect(worker.onerror).toBeNull()
+    expect(worker.onmessageerror).toBeNull()
+    expect(vi.getTimerCount()).toBe(0)
+    expect(calculator.status.value).toBe('idle')
+    expect(calculator.selectedSize.value).toBe(10000)
+    if (exit === 'success') {
+      expect(calculator.results.value).not.toBe(previous)
+      expect(calculator.error.value).toBeNull()
+    } else {
+      expect(calculator.results.value).toBe(previous)
+      expect(calculator.consumptionSummary.value).toBe(previous.consumptionSummary)
+      expect(calculator.error.value).toContain('Vorhandene Ergebnisse bleiben unverändert')
+      if (exit === 'message decode error') {
+        expect(calculator.error.value).toContain('Ergebnisse der Simulation konnten nicht gelesen werden')
+      }
+      if (exit === 'postMessage throw') expect(calculator.error.value).toContain('postMessage failed')
+    }
+    const finalResult = calculator.results.value
+    const finalError = calculator.error.value
+    await vi.advanceTimersByTimeAsync(120000)
+    expect(calculator.results.value).toBe(finalResult)
+    expect(calculator.error.value).toBe(finalError)
+    expect(worker.terminate).toHaveBeenCalledTimes(1)
+  },
+)
