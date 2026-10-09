@@ -314,6 +314,21 @@
           </b-card>
         </template>
       </b-table>
+      <footer v-if="displayData.length > 0"
+              class="mt-3 mb-4" aria-labelledby="custom-consumption-summary-heading">
+        <h5 id="custom-consumption-summary-heading">Annual consumption — {{ customConsumptionYear }}</h5>
+        <ul class="mb-1">
+          <li><strong>Household:</strong> {{ formatSummaryNumber(householdConsumptionKwh) }} kWh</li>
+          <li v-for="(item, index) in customConsumptionSummary" :key="index">
+            <strong>{{ item.name }}:</strong>
+            {{ formatSummaryNumber(item.count) }} {{ item.type === 'electric-car' ? 'charging sessions' : 'days' }}<template v-if="item.type === 'heating'">,
+              {{ formatSummaryNumber(item.hours) }} hours</template>,
+            {{ formatSummaryNumber(item.energyKwh) }} kWh
+          </li>
+        </ul>
+        <p class="mb-1"><strong>Total consumption: {{ formatSummaryNumber(totalConsumptionKwh) }} kWh</strong></p>
+        <small class="text-muted">Full-year load profile. Counts include starts within this year; hours and energy include carry-in from the previous year.</small>
+      </footer>
     </b-overlay>
     <FAQ />
     <NuxtLink to="/impress">Impressum / Datenschutz</NuxtLink>
@@ -333,6 +348,8 @@ import {
   energyFlow
 } from "@/functions/energyFlow";
 import { factorFunction, PROFILEBASE, SLPH0 } from "@/functions/SLP";
+import customConsumptionYaml from '!!raw-loader!../custom-consumption.yaml';
+import { parseCustomConsumptions, addCustomConsumptions, summarizeCustomConsumptions } from '@/functions/customConsumption';
 
 export default {
   name: 'IndexPage',
@@ -344,6 +361,10 @@ export default {
   data() {
     return {
       displayData: [],
+      customConsumptionSummary: [],
+      customConsumptionYear: null,
+      householdConsumptionKwh: 0,
+      totalConsumptionKwh: 0,
       returnedData: {},
       tableFields:[
         { key: 'size', label: 'Speichergröße', formatter: (val) => (val/1000).toFixed(1) + " kWh" },
@@ -359,17 +380,13 @@ export default {
       ],
       inputBatterySizes: [],
       batterySizes: JSON.parse(localStorage.getItem('storedSizes')) || [
-        500,
-        1000,
-        2000,
-        4000,
-        6000,
-        8000,
-        12000,
-        16000,
+        5000,
+        10000,
+        15000,
         20000,
-        25000,
-        30000
+        30000,
+        40000,
+        50000
       ],
       input: JSON.parse(localStorage.getItem('storedInput')) || {
         roofs: [],
@@ -428,6 +445,9 @@ export default {
   },
   methods: {
 
+    formatSummaryNumber(value) {
+      return value.toLocaleString('en-GB', { maximumFractionDigits: 1 })
+    },
     async generateData() {
       if (this.isCalculating) return
       this.calculationError = ""
@@ -438,10 +458,16 @@ export default {
       this.isCalculating = true
       try {
         await this.calculateData()
-      } catch {
+      } catch (error) {
         this.roofsData = []
         this.displayData = []
-        this.calculationError = "Calculation failed. Check that the backend is running and try again. The PVGIS service may be temporarily unavailable."
+        this.customConsumptionSummary = []
+        this.customConsumptionYear = null
+        this.householdConsumptionKwh = 0
+        this.totalConsumptionKwh = 0
+        this.calculationError = error.message && error.message.startsWith('Custom consumption:')
+          ? error.message
+          : "Calculation failed. Check that the backend is running and try again. The PVGIS service may be temporarily unavailable."
       } finally {
         this.isCalculating = false
       }
@@ -460,6 +486,10 @@ export default {
 
       this.isCalculating = true
       this.roofsData = []
+
+      const customConsumptions = parseCustomConsumptions(customConsumptionYaml)
+      const customConsumptionYear = Number(this.input.year)
+      const customConsumptionSummary = summarizeCustomConsumptions(customConsumptions, customConsumptionYear)
 
       const generationData = await Promise.all(this.input.roofs.map(roof => {
         return this.$axios.post("/relay", {
@@ -492,7 +522,10 @@ export default {
 
       const mergedPower = mergePowerGeneration(generationData)
 
-      const consumption = calculateConsumption({ year: this.input.year, consumptionYear: this.input.yearlyConsumption, profile: SLPH0, profileBase: PROFILEBASE, factorFunction })
+      const householdConsumption = calculateConsumption({ year: this.input.year, consumptionYear: this.input.yearlyConsumption, profile: SLPH0, profileBase: PROFILEBASE, factorFunction })
+      const consumption = addCustomConsumptions(householdConsumption, customConsumptions, this.input.year)
+      const householdConsumptionKwh = Object.values(householdConsumption).reduce((sum, hour) => sum + hour.P, 0) / 1000
+      const totalConsumptionKwh = Object.values(consumption).reduce((sum, hour) => sum + hour.P, 0) / 1000
       const powerGenAndConsumption = generateDayTimeValues({ consumption, powerGeneration: mergedPower, year: this.input.year })
 
       let costSavingWithoutBattery
@@ -534,7 +567,7 @@ export default {
         const missedInverterPower = energyFlowData.reduce((prev, curr) => curr.missedInverterPower + prev, 0) / 1000
         const selfUsedPower = energyFlowData.reduce((prev, curr) => curr.selfUsagePower + prev, 0) / 1000
         const fedInPower = energyFlowData.reduce((prev, curr) => curr.feedInPowerGrid + prev, 0) / 1000
-        const selfSufficiencyRate = selfUsedPower / this.input.yearlyConsumption * 100 // Autarkiegrad
+        const selfSufficiencyRate = consumptionYear > 0 ? selfUsedPower / consumptionYear * 100 : 0 // Autarkiegrad
         const selfUseRate = selfUsedPower / generationYear * 100 // Eigenverbrauchsquote
         const costSavings = (selfUsedPower * this.input.consumptionCosts + fedInPower * this.input.feedInCompensation)
         if (size == 1) costSavingWithoutBattery = costSavings;
@@ -629,6 +662,10 @@ export default {
       this.timeNeeded = performance.now() - now
       this.isCalculating = false
       this.displayData = BatterySizeResults
+      this.customConsumptionSummary = customConsumptionSummary
+      this.customConsumptionYear = customConsumptionYear
+      this.householdConsumptionKwh = householdConsumptionKwh
+      this.totalConsumptionKwh = totalConsumptionKwh
     },
     async getCoordinatesByAddress() {
       if (this.isSearchingAddress) return

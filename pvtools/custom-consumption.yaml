@@ -1,0 +1,30 @@
+consumptions:
+  - name: Poolheizung Frühling
+    type: heating
+    power: 2500
+    schedule: "05:00-22:00"
+    start-date: "2024-03-10"
+    end-date: "2024-05-31"
+  - name: Poolheizung Sommer
+    type: heating
+    power: 2500
+    schedule: "09:00-18:00"
+    start-date: "2024-06-01"
+    end-date: "2024-08-31"
+  - name: Poolheizung Herbst
+    type: heating
+    power: 2500
+    schedule: "05:00-22:00"
+    start-date: "2024-09-01"
+    end-date: "2024-10-10"
+  - name: Opel Grandland electric
+    type: electric-car
+    power: 11000
+    capacity: 50000
+    # Charging schedule for the Opel Grandland electric: day of week: percentage of battery, start-time
+    starts: "monday:80%,20:00, wednesday:80%,10:00,friday:50%,08:00"
+  - name: Opel Corsa electric
+    type: electric-car
+    power: 11000
+    capacity: 50000
+    starts: "monday:60%,20:00,wednesday:50%,8:00,friday:60%,15:00"

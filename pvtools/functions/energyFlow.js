@@ -202,6 +202,7 @@ const energyFlow = ( {
 
 const calculateConsumption = ({year, consumptionYear, profile, profileBase = 1000, factorFunction}) => {
 
+    year = Number(year)
     // IF profil is based on 1000kWh per year, it must be multiplied by difference of real consumption (e.g. 5000kWh = multiplier 5x)
     const consumptionFactor = consumptionYear / profileBase
     let currentDay = new Date(Date.UTC(year,    0, 1,0,0))
@@ -211,11 +212,14 @@ const calculateConsumption = ({year, consumptionYear, profile, profileBase = 100
     // Needed for factorFunction "Standardlastprofil BDEW"
     let dayTimer = 1
 
-    while (currentDay <= lastDay) {
+    while (currentDay < lastDay) {
         
         
         let currentProfile = profile
-        .find(season => new Date(season.till + "/" + year ) >= currentDay) // TODO/BUG: this finds the next season one day earlier (03/21 is falsy at currentDay 03/21)
+        .find(season => {
+            const [month, day] = season.till.split('/').map(Number)
+            return new Date(Date.UTC(year, month - 1, day)) >= currentDay
+        })
 
         if (!currentProfile) {                  //TODO/BUG: The date "till: 12/31" aren't find correctly.
             currentProfile = profile
@@ -225,9 +229,9 @@ const calculateConsumption = ({year, consumptionYear, profile, profileBase = 100
 
         for (let hour = 0; hour < 24; hour++) {
 
-            const timeString = `${year}${('00' + (currentDay.getMonth() + 1)).slice(-2)}${('00' + (currentDay.getDate())).slice(-2)}:${('00' + hour).slice(-2)}`
+            const timeString = `${year}${String(currentDay.getUTCMonth() + 1).padStart(2, '0')}${String(currentDay.getUTCDate()).padStart(2, '0')}:${String(hour).padStart(2, '0')}`
             let consumption
-            switch (currentDay.getDay()) {      // find the right day for profile | 0 = sun, 1 = mon, ..., 6 = sat
+            switch (currentDay.getUTCDay()) {      // find the right day for profile | 0 = sun, 1 = mon, ..., 6 = sat
                 case 0:
                     consumption = currentProfile.profileDays['sun'][hour] || currentProfile.profileDays['default'][hour] 
                     break;
@@ -250,7 +254,7 @@ const calculateConsumption = ({year, consumptionYear, profile, profileBase = 100
             }
             
         }
-        currentDay.setDate(currentDay.getDate() + 1)    // set one day after
+        currentDay.setUTCDate(currentDay.getUTCDate() + 1)    // set one day after
         dayTimer++
 
     } 

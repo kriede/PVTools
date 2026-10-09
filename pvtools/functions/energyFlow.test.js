@@ -17,6 +17,7 @@ describe('PV > Consumption',() => {
                     batteryEfficiency: .99
                 })
         expect(data).toEqual({
+            dayTime: '',
             newBatterySoc: 1000 * .99 + 5000,
             selfUsagePower: 4000,
             selfUsagePowerPv: 4000,
@@ -41,6 +42,7 @@ describe('PV > Consumption',() => {
                     maxPowerLoadBattery: 2000
                 })
         expect(data).toEqual({
+            dayTime: '',
             newBatterySoc: 2000 + 5000,
             selfUsagePower: 0,
             selfUsagePowerPv: 0,
@@ -65,6 +67,7 @@ describe('PV > Consumption',() => {
                     maxPowerLoadBattery: 2000
                 })
         expect(data).toEqual({
+            dayTime: '',
             newBatterySoc: 2000 + 5000,
             selfUsagePower: 2000,
             selfUsagePowerPv: 2000,
@@ -89,6 +92,7 @@ describe('PV > Consumption',() => {
                     maxPowerGenerationInverter: 4500
                 })
         expect(data).toEqual({
+            dayTime: '',
             newBatterySoc: 500 * .99 + 5000,
             selfUsagePower: 4000,
             selfUsagePowerPv: 4000,
@@ -113,6 +117,7 @@ describe('PV > Consumption',() => {
                     batteryEfficiency: .99 // unload as default
                 })
         expect(data).toEqual({
+            dayTime: '',
             newBatterySoc: 1000 * .95 + 5000,
             selfUsagePower: 4000,
             selfUsagePowerPv: 4000,
@@ -136,6 +141,7 @@ describe('PV > Consumption',() => {
                     batteryEfficiency: .99
                 })
         expect(data).toEqual({
+            dayTime: '',
             newBatterySoc: 5000,
             selfUsagePower: 4000,
             selfUsagePowerPv: 4000,
@@ -159,6 +165,7 @@ describe('PV > Consumption',() => {
                     maxPowerFeedIn: 2000
                 })
         expect(data).toEqual({
+            dayTime: '',
             newBatterySoc: 5000,
             selfUsagePower: 2000,
             selfUsagePowerPv: 2000,
@@ -182,6 +189,7 @@ describe('PV > Consumption',() => {
                     batteryEfficiency: .99
                 })
         expect(data).toEqual({
+            dayTime: '',
             newBatterySoc: 5500,
             selfUsagePower: 4000,
             selfUsagePowerPv: 4000,
@@ -208,6 +216,7 @@ describe('PV < Consumption', () => {
                     batteryEfficiency: .99
                 })
         expect(data).toEqual({
+            dayTime: '',
             newBatterySoc: 5000 - 1000 / 0.99,
             selfUsagePower: 6000,
             selfUsagePowerPv: 5000,
@@ -232,6 +241,7 @@ describe('PV < Consumption', () => {
                     maxPowerGenerationBattery: 1000
                 })
         expect(data).toEqual({
+            dayTime: '',
             newBatterySoc: 5000 - 1000 / 0.99,
             selfUsagePower: 4000,
             selfUsagePowerPv: 3000,
@@ -256,6 +266,7 @@ describe('PV < Consumption', () => {
                     maxPowerGenerationBattery: 1000
                 })
         expect(data).toEqual({
+            dayTime: '',
             newBatterySoc: 3000 - 1000 / 0.99,
             selfUsagePower: 4000,
             selfUsagePowerPv: 3000,
@@ -280,6 +291,7 @@ describe('PV < Consumption', () => {
                     batteryUnloadEfficiency: .80
                 })
         expect(data).toEqual({
+            dayTime: '',
             newBatterySoc: 5000 - 1000 / 0.80,
             selfUsagePower: 6000,
             selfUsagePowerPv: 5000,
@@ -303,6 +315,7 @@ describe('PV < Consumption', () => {
                     batteryEfficiency: .99
                 })
         expect(data).toEqual({
+            dayTime: '',
             newBatterySoc: 100,
             selfUsagePower: 5000,
             selfUsagePowerPv: 5000,
@@ -326,6 +339,7 @@ describe('PV < Consumption', () => {
                     batteryEfficiency: .99
                 })
         expect(data).toEqual({
+            dayTime: '',
             newBatterySoc: 500,
             selfUsagePower: 5500,
             selfUsagePowerPv: 5000,
