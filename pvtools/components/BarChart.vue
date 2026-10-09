@@ -1,131 +1,72 @@
 <template>
+  <div :class="cssClasses" :style="[{ height: `${height}px` }, styles]">
     <Bar
-      :chart-options="chartOptions"
-      :chart-data="chartData"
-      :chart-id="chartId"
+      :key="isDark"
+      :id="chartId"
+      :data="chartData"
+      :options="chartOptions"
       :dataset-id-key="datasetIdKey"
       :plugins="plugins"
-      :css-classes="cssClasses"
-      :styles="styles"
       :width="width"
       :height="height"
+      aria-label="Energiefluss nach Zeitraum"
     />
-  </template>
-  
-  <script>
-  import { Bar } from 'vue-chartjs/legacy'
-  import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, LineElement, PointElement, LineController, CategoryScale, LinearScale } from 'chart.js'
-  
-  ChartJS.register(Title, Tooltip, Legend, BarElement, LineElement, PointElement, LineController, CategoryScale, LinearScale)
-  
-  export default {
-    name: 'BarChart',
-    components: { Bar },
-    props: {
-      chartId: {
-        type: String,
-        default: 'bar-chart'
-      },
-      datasetIdKey: {
-        type: String,
-        default: 'label'
-      },
-    //   chartData: {
-    //     type: Object,
-    //     required: true
-    // //   },
-    //   chartOptions: {
-    //     type: Object,
-    //     default: () => {}
-    //   },
-      width: {
-        type: Number,
-        default: 400
-      },
-      height: {
-        type: Number,
-        default: 400
-      },
-      cssClasses: {
-        default: '',
-        type: String
-      },
-      styles: {
-        type: Object,
-        default: () => {}
-      },
-      plugins: {
-        type: Object,
-        default: () => {}
-      },
-      labels: {
-      type: Array,
-      default: []
-      },
-      datasets: {
-      type: Array,
-      default: []
-      },
-      axisTitle: {
-        type: String,
-        default: ''
-      },
-      showBatteryAxis: {
-        type: Boolean,
-        default: false
-      }
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+import { Bar } from 'vue-chartjs'
+import {
+  Chart as ChartJS, Title, Tooltip, Legend, BarElement, LineElement,
+  PointElement, LineController, CategoryScale, LinearScale,
+} from 'chart.js'
+import { useTheme } from '../composables/useTheme.js'
+import { axis, baseOptions, themeColors } from '../lib/chartTheme.js'
+
+ChartJS.register(Title, Tooltip, Legend, BarElement, LineElement, PointElement,
+  LineController, CategoryScale, LinearScale)
+
+const props = defineProps({
+  chartId: { type: String, default: 'energy-flow-chart' },
+  datasetIdKey: { type: String, default: 'label' },
+  width: { type: Number, default: 400 },
+  height: { type: Number, default: 400 },
+  cssClasses: { type: String, default: '' },
+  styles: { type: Object, default: () => ({}) },
+  plugins: { type: Array, default: () => [] },
+  labels: { type: Array, default: () => [] },
+  datasets: { type: Array, default: () => [] },
+  axisTitle: { type: String, default: '' },
+  showBatteryAxis: { type: Boolean, default: false },
+})
+const emit = defineEmits(['bar-click'])
+const { isDark } = useTheme()
+const chartData = computed(() => ({ labels: props.labels, datasets: props.datasets }))
+const chartOptions = computed(() => {
+  void isDark.value
+  const colors = themeColors()
+  return {
+    ...baseOptions(colors),
+    locale: 'de-DE',
+    onClick: (event, elements) => {
+      const bar = elements.find(element => props.datasets[element.datasetIndex]?.type !== 'line')
+      if (bar) emit('bar-click', bar.index)
     },
-    computed: {
-        chartData(){
-            return {
-                labels: this.labels,
-                datasets: this.datasets
-            }
-        }
+    scales: {
+      x: axis(colors, { stacked: true, grid: { display: false } }),
+      y: axis(colors, {
+        stacked: true,
+        title: { display: Boolean(props.axisTitle), text: props.axisTitle, color: colors.muted },
+      }),
+      soc: axis(colors, {
+        type: 'linear', position: 'right', display: props.showBatteryAxis,
+        min: 0, max: 100, stacked: false,
+        grid: { drawOnChartArea: false },
+        ticks: { ...axis(colors).ticks, callback: value => `${value} %` },
+        title: { display: true, text: 'Batterie-Füllstand (%)', color: colors.muted },
+      }),
     },
-    watch: {
-      axisTitle(value) {
-        this.chartOptions.scales.y.title = { display: Boolean(value), text: value }
-      },
-      showBatteryAxis(value) {
-        this.chartOptions.scales.soc.display = value
-      }
-    },
-    data() {
-      return {
-        // chartData: {
-        //   labels: [ 'January', 'February', 'March' ],
-        //   datasets: [ { data: [40, 20, 12] } ]
-        // },
-        chartOptions: {
-          responsive: true,
-          locale: 'de-DE',
-          onClick: (event, elements) => {
-            const bar = elements.find(element => this.datasets[element.datasetIndex].type !== 'line')
-            if (bar) this.$emit('bar-click', bar.index)
-          },
-          scales: {
-            x: {
-                stacked: true,
-            },
-            y: {
-                stacked: true,
-              title: { display: Boolean(this.axisTitle), text: this.axisTitle },
-            },
-            soc: {
-              type: 'linear',
-              position: 'right',
-              display: this.showBatteryAxis,
-              min: 0,
-              max: 100,
-              stacked: false,
-              grid: { drawOnChartArea: false },
-              ticks: { callback: value => `${value} %` },
-              title: { display: true, text: 'Batterie-Füllstand (%)' }
-            }
-            }
-        }
-      }
-    }
   }
-  </script>
+})
+</script>

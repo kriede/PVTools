@@ -1,4 +1,4 @@
-const { parse } = require('yaml')
+import { parse } from 'yaml'
 
 const HOUR = 3600000
 const DAY = 24 * HOUR
@@ -89,6 +89,8 @@ function parseCustomConsumptions(text) {
   })
 }
 
+// UTC arithmetic represents timezone-free German wall-clock labels, not UTC
+// instants. These keys already match the simulation output; never shift again.
 function timeKey(time) {
   const date = new Date(time)
   return `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, '0')}${String(date.getUTCDate()).padStart(2, '0')}:${String(date.getUTCHours()).padStart(2, '0')}`
@@ -168,4 +170,4 @@ function summarizeCustomConsumptions(entries, year) {
   })
 }
 
-module.exports = { parseCustomConsumptions, addCustomConsumptions, summarizeCustomConsumptions }
+export { parseCustomConsumptions, addCustomConsumptions, summarizeCustomConsumptions }

@@ -1,8 +1,9 @@
-const fs = require('fs')
-const path = require('path')
-const { parseCustomConsumptions, addCustomConsumptions, summarizeCustomConsumptions } = require('./customConsumption')
-const { calculateConsumption, generateDayTimeValues, energyFlow } = require('./energyFlow')
-const { SLPH0, PROFILEBASE, factorFunction } = require('./SLP')
+import { expect, test } from 'vitest'
+import customConsumptionYaml from '../custom-consumption.yaml?raw'
+import { parseCustomConsumptions, addCustomConsumptions, summarizeCustomConsumptions } from './customConsumption.js'
+import { calculateConsumption, generateDayTimeValues, energyFlow } from './energyFlow.js'
+import { SLPH0, PROFILEBASE, factorFunction } from './SLP.js'
+import regressionDb from './regression.json'
 
 function base(year, power = 100) {
   const result = {}
@@ -25,7 +26,7 @@ function parse(entries) { return parseCustomConsumptions(JSON.stringify({ consum
 function total(profile) { return Object.values(profile).reduce((sum, hour) => sum + hour.P, 0) }
 
 test('parses actual YAML and combines every configured consumer with household load', () => {
-  const entries = parseCustomConsumptions(fs.readFileSync(path.join(__dirname, '../custom-consumption.yaml'), 'utf8'))
+  const entries = parseCustomConsumptions(customConsumptionYaml)
   expect(entries).toHaveLength(5)
   const original = base(2020)
   const profile = addCustomConsumptions(original, entries, 2020)
@@ -106,6 +107,28 @@ test('February 29 runs only in leap years', () => {
   const entries = parse([heater({ schedule: '00:00-24:00', 'start-date': '2024-02-29', 'end-date': '2024-02-29' })])
   expect(total(addCustomConsumptions(base(2020, 0), entries, 2020))).toBe(60000)
   expect(total(addCustomConsumptions(base(2019, 0), entries, 2019))).toBe(0)
+})
+
+test('German wall-clock schedules keep their output hour across DST transitions without a second shift', () => {
+  const entries = parse([heater({ schedule: '08:00-09:00', 'start-date': '2024-01-01', 'end-date': '2024-12-31' })])
+  const profile = addCustomConsumptions(base(2020, 0), entries, 2020)
+  for (const day of ['20200101', '20200329', '20200701', '20201025', '20201231']) {
+    expect(profile[`${day}:07`].P).toBe(0)
+    expect(profile[`${day}:08`].P).toBe(2500)
+    expect(profile[`${day}:09`].P).toBe(0)
+  }
+  expect(total(profile)).toBe(366 * 2500)
+})
+
+test('carry-in and carry-out are clipped to each non-leap or leap calculation year', () => {
+  const entries = parse([car({ starts: 'tuesday:60%,22:00' })])
+  for (const year of [2019, 2020, 2021]) {
+    const profile = addCustomConsumptions(base(year, 0), entries, year)
+    const summary = summarizeCustomConsumptions(entries, year)[0]
+    expect(Object.keys(profile)).toHaveLength(year === 2020 ? 8784 : 8760)
+    expect(Object.keys(profile).every(key => key.startsWith(String(year)))).toBe(true)
+    expect(total(profile) / 1000).toBeCloseTo(summary.energyKwh, 6)
+  }
 })
 
 test('EV energy equals replenishment percentage and splits across midnight', () => {
@@ -212,23 +235,22 @@ test('missing household hours use a German diagnostic', () => {
   )
 })
 
-test('household calendar preserves January 1 and works independently of local timezone', () => {
-  const oldTZ = process.env.TZ
-  process.env.TZ = 'America/Los_Angeles'
-  try {
-    const profile = calculateConsumption({ year: '2020', consumptionYear: 5000, profile: SLPH0, profileBase: PROFILEBASE, factorFunction })
-    expect(Object.keys(profile)).toHaveLength(8784)
-    expect(profile['20200101:00'].P).toBeCloseTo(factorFunction(1, SLPH0[0].profileDays.weekdays[0] * 5))
-    const combined = addCustomConsumptions(profile, parse([heater()]), 2020)
-    const generation = base(2020, 0)
-    const joined = generateDayTimeValues({ consumption: combined, powerGeneration: generation, year: 2020 })
-    expect(joined).toHaveLength(8784)
-    const flows = joined.map(hour => energyFlow({ powerGeneration: hour.P, powerConsumption: hour.consumption,
-      batterySoc: 0, batterySocMax: 0, batterySocMin: 0, dayTime: hour.dayTime }))
-    expect(flows.reduce((sum, flow) => sum + flow.consumptionGrid + flow.selfUsagePower, 0)).toBeCloseTo(total(combined), 4)
-    expect(total(combined) - total(profile)).toBeCloseTo(8750, 4)
-  } finally {
-    if (oldTZ === undefined) delete process.env.TZ
-    else process.env.TZ = oldTZ
-  }
+test.each(['loadDistribution', 'legacyRegression'])('household and custom consumption conserve energy with %s', hourModel => {
+  const profile = calculateConsumption({ year: '2020', consumptionYear: 5000, profile: SLPH0, profileBase: PROFILEBASE, factorFunction })
+  expect(Object.keys(profile)).toHaveLength(8784)
+  expect(profile['20200101:00'].P).toBeCloseTo(factorFunction(1, SLPH0[0].profileDays.weekdays[0] * 5))
+  const combined = addCustomConsumptions(profile, parse([heater()]), 2020)
+  const generation = base(2020, 0)
+  const joined = generateDayTimeValues({ consumption: combined, powerGeneration: generation, year: 2020 })
+  expect(joined).toHaveLength(8784)
+  const flows = joined.map(hour => energyFlow({ energyGeneration: hour.P, energyConsumption: hour.consumption,
+    batterySoc: 0, batterySocMax: 0, batterySocMin: 0, dayTime: hour.dayTime, hourModel, regressionDb }))
+  flows.forEach((flow, index) => {
+    expect(flow.dayTime).toBe(joined[index].dayTime)
+    expect(flow.powerProduction).toBe(0)
+    expect(flow.selfUsedEnergy).toBe(0)
+    expect(flow.gridUsedEnergy).toBeCloseTo(joined[index].consumption, 6)
+  })
+  expect(flows.reduce((sum, flow) => sum + flow.gridUsedEnergy + flow.selfUsedEnergy, 0)).toBeCloseTo(total(combined), 4)
+  expect(total(combined) - total(profile)).toBeCloseTo(8750, 4)
 })

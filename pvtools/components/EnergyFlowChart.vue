@@ -1,41 +1,40 @@
 <template>
-  <section aria-label="Energieflussdiagramm">
+  <section aria-label="Energieflussdiagramm" :aria-busy="busy">
     <div class="energy-toolbar">
       <h4 class="mb-0">Energiefluss</h4>
       <div class="energy-controls">
-        <b-button-group aria-label="Diagrammzeitraum">
-          <b-button v-for="period in periods" :key="period" size="sm" :disabled="busy"
-                    :variant="mode === period ? 'primary' : 'outline-primary'"
-                    :aria-pressed="mode === period" @click="mode = period">{{ periodLabels[period] }}</b-button>
-        </b-button-group>
-        <b-button size="sm" variant="outline-secondary" :disabled="busy || mode === 'year'"
-                  aria-label="Zur übergeordneten Ansicht" @click="drillOut">↑ Übersicht</b-button>
-        <b-form-select v-if="mode === 'year'" :value="simulationYear" :options="yearOptions"
-                       :disabled="busy" size="sm" aria-label="Vergleichsjahr"
-                       @change="requestYear" />
+        <div class="energy-periods" role="group" aria-label="Diagrammzeitraum">
+          <button v-for="period in periods" :key="period" type="button" :disabled="busy"
+            :class="{ active: mode === period }"
+            :aria-pressed="mode === period" @click="mode = period">{{ periodLabels[period] }}</button>
+        </div>
+        <button type="button" :disabled="busy || mode === 'year'"
+          aria-label="Zur übergeordneten Ansicht" @click="drillOut">↑ Übersicht</button>
+        <select v-if="mode === 'year'" :value="simulationYear" :disabled="busy" aria-label="Vergleichsjahr"
+          @change="requestYear($event.target.value)">
+          <option v-for="year in yearOptions" :key="year" :value="year">{{ year }}</option>
+        </select>
         <div v-if="mode !== 'year'" class="energy-navigation">
-          <b-button size="sm" variant="outline-secondary" :disabled="busy || position <= 0"
-                    :aria-label="`Vorheriger Zeitraum: ${periodLabels[mode]}`" @click="move(-1)">‹</b-button>
-          <b-form-input v-if="mode === 'day'" type="date" :value="selectedDate"
-                        :min="index.dates[0]" :max="index.dates[index.dates.length - 1]"
-                        :disabled="busy" size="sm" aria-label="Simulationstag" @input="selectDate" />
-          <b-form-datepicker v-if="mode === 'day'" button-only :value="selectedDate" :min="index.dates[0]"
-                             :max="index.dates[index.dates.length - 1]" :date-disabled-fn="dateDisabled"
-                             locale="de-DE" :start-weekday="1" size="sm" aria-label="Simulationskalender öffnen"
-                             :disabled="busy" v-bind="calendarLabels"
-                             :date-format-options="{ year: 'numeric', month: 'short', day: 'numeric' }"
-                             @input="selectDate" />
-          <b-form-select v-else-if="mode === 'week'" :value="weekKey" :options="weekOptions" size="sm"
-                         :disabled="busy" aria-label="Kalenderwoche" @change="selectWeek" />
-          <b-form-select v-else :value="selectedDate.slice(0, 7)" :options="monthOptions" size="sm"
-                         :disabled="busy" aria-label="Simulationsmonat" @change="selectMonth" />
-          <b-button size="sm" variant="outline-secondary" :disabled="busy || position >= available.length - 1"
-                    :aria-label="`Nächster Zeitraum: ${periodLabels[mode]}`" @click="move(1)">›</b-button>
+            <button type="button" :disabled="busy || position <= 0"
+              :aria-label="`Vorheriger Zeitraum: ${periodLabels[mode]}`" @click="move(-1)">‹</button>
+            <input v-if="mode === 'day'" type="date" :value="selectedDate"
+             :min="index.dates[0]" :max="index.dates[index.dates.length - 1]"
+             :disabled="busy" aria-label="Simulationstag" @change="selectDate($event.target.value)" />
+            <select v-else-if="mode === 'week'" :value="weekKey" :disabled="busy" aria-label="Kalenderwoche"
+              @change="selectWeek($event.target.value)">
+              <option v-for="week in weekOptions" :key="week.value" :value="week.value">{{ week.text }}</option>
+            </select>
+            <select v-else :value="selectedDate.slice(0, 7)" :disabled="busy" aria-label="Simulationsmonat"
+              @change="selectMonth($event.target.value)">
+              <option v-for="month in monthOptions" :key="month.value" :value="month.value">{{ month.text }}</option>
+            </select>
+            <button type="button" :disabled="busy || position >= available.length - 1"
+              :aria-label="`Nächster Zeitraum: ${periodLabels[mode]}`" @click="move(1)">›</button>
         </div>
       </div>
     </div>
-    <small v-if="mode === 'week'" class="d-block text-muted mb-2">Kalenderwochen laufen von Montag bis Sonntag. Jeder Balken entspricht einer Stunde. Leere Stunden liegen außerhalb der Simulation oder enthalten keine Daten.</small>
-    <small v-if="batteryCapacity > 1" class="d-block text-muted mb-2">Der Batterie-Füllstand zeigt den Stand am Ende der Stunde, des Tages oder des Monats.</small>
+    <small v-if="mode === 'week'" class="block text-muted mb-2">Kalenderwochen laufen von Montag bis Sonntag. Jeder Balken entspricht einer Stunde. Leere Stunden liegen außerhalb der Simulation oder enthalten keine Daten.</small>
+    <small v-if="batteryCapacity > 1" class="block text-muted mb-2">Der Batterie-Füllstand zeigt den Stand am Ende der Stunde, des Tages oder des Monats.</small>
     <BarChart :labels="buckets.map(bucket => bucket.label)" :datasets="datasets"
           :axis-title="mode === 'year' ? 'Energie (kWh pro Monat)' : mode === 'month' ? 'Energie (kWh pro Tag)' : 'Energie (kWh pro Stunde)'"
           :show-battery-axis="batteryCapacity > 1" @bar-click="drillDown" />
@@ -43,12 +42,14 @@
 </template>
 
 <script>
-import BarChart from './BarChart'
-import { indexEnergyFlow, chartBuckets, isoWeek } from '../functions/energyChart'
+import BarChart from './BarChart.vue'
+import { indexEnergyFlow, chartBuckets, isoWeek } from '../functions/energyChart.js'
+import { ENERGY_COLORS } from '../lib/chartTheme.js'
 
 export default {
   name: 'EnergyFlowChart',
   components: { BarChart },
+  emits: ['year-change'],
   props: {
     energyFlow: { type: Array, required: true },
     batteryCapacity: { type: Number, default: 0 },
@@ -58,15 +59,7 @@ export default {
   data() {
     return {
       periods: ['year', 'month', 'week', 'day'], mode: 'year', selectedDate: '',
-      periodLabels: { year: 'Jahr', month: 'Monat', week: 'Woche', day: 'Tag' },
-      calendarLabels: {
-        labelPrevDecade: 'Vorheriges Jahrzehnt', labelPrevYear: 'Vorheriges Jahr',
-        labelPrevMonth: 'Vorheriger Monat', labelCurrentMonth: 'Aktueller Monat',
-        labelNextMonth: 'Nächster Monat', labelNextYear: 'Nächstes Jahr', labelNextDecade: 'Nächstes Jahrzehnt',
-        labelToday: 'Heute', labelSelected: 'Ausgewähltes Datum', labelNoDateSelected: 'Kein Datum ausgewählt',
-        labelCalendar: 'Kalender', labelNav: 'Kalendernavigation', labelHelp: 'Mit den Pfeiltasten im Kalender navigieren',
-        labelResetButton: 'Zurücksetzen', labelCloseButton: 'Schließen', labelTodayButton: 'Heute'
-      }
+      periodLabels: { year: 'Jahr', month: 'Monat', week: 'Woche', day: 'Tag' }
     }
   },
   computed: {
@@ -90,10 +83,10 @@ export default {
     buckets() { return this.selectedDate ? chartBuckets(this.index, this.mode, this.selectedDate) : [] },
     datasets() {
       const energy = [
-        ['feedInPowerGrid', 'Netzeinspeisung', 'orange', -1],
-        ['selfUsagePowerPv', 'PV-Eigenverbrauch', 'green', 1],
-        ['selfUsagePowerBattery', 'Batterie-Eigenverbrauch', 'blue', 1],
-        ['consumptionGrid', 'Netzbezug', 'red', 1]
+        ['feedInEnergyGrid', 'Netzeinspeisung', ENERGY_COLORS.feedin, -1],
+        ['selfUsedEnergyPV', 'PV-Eigenverbrauch', ENERGY_COLORS.pv, 1],
+        ['selfUsedEnergyBattery', 'Batterie-Eigenverbrauch', ENERGY_COLORS.battery, 1],
+        ['gridUsedEnergy', 'Netzbezug', ENERGY_COLORS.grid, 1]
       ].map(([field, label, backgroundColor, sign]) => ({
         label, backgroundColor, stack: 'energy', yAxisID: 'y',
         data: this.buckets.map(bucket => bucket.values ? bucket.values[field] * sign / 1000 : null)
@@ -117,19 +110,22 @@ export default {
   },
   methods: {
     requestYear(year) {
-      if (!this.busy && Number(year) !== this.simulationYear) this.$emit('year-change', Number(year))
+      const requested = Number(year)
+      if (!this.busy && this.yearOptions.includes(requested) && requested !== this.simulationYear) this.$emit('year-change', requested)
     },
-    dateDisabled(date) { return !this.index.days[date] },
-    selectDate(date) { if (this.index.days[date]) this.selectedDate = date },
+    selectDate(date) { if (!this.busy && this.index.days[date]) this.selectedDate = date },
     selectWeek(key) {
+      if (this.busy) return
       const date = this.index.dates.find(date => isoWeek(date).key === key)
       if (date) this.selectedDate = date
     },
     selectMonth(month) {
+      if (this.busy) return
       const date = this.index.dates.find(date => date.startsWith(month))
       if (date) this.selectedDate = date
     },
     move(direction) {
+      if (this.busy) return
       const next = this.available[this.position + direction]
       if (!next) return
       if (this.mode === 'day') this.selectDate(next)
@@ -164,13 +160,24 @@ export default {
 }
 .energy-toolbar { justify-content: space-between; flex-wrap: wrap; margin-bottom: 1rem; }
 .energy-controls { flex-wrap: wrap; }
-.energy-controls > .custom-select { width: auto; }
+.energy-periods { display: flex; gap: .25rem; }
+.energy-controls button, .energy-controls select, .energy-controls input {
+  border: 1px solid var(--line);
+  border-radius: .375rem;
+  background: var(--surface);
+  color: var(--ink);
+  padding: .35rem .6rem;
+  font-size: .875rem;
+}
+.energy-controls button.active { background: var(--brand); color: var(--surface); }
+.energy-controls :disabled { opacity: .5; cursor: not-allowed; }
+.energy-controls :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .energy-navigation { gap: .4rem; }
-.energy-navigation .custom-select { width: auto; }
+.energy-navigation select { width: auto; }
 .energy-navigation input { width: 10rem; }
 @media (max-width: 640px) {
   .energy-controls { width: 100%; }
   .energy-navigation { width: 100%; }
-  .energy-navigation .custom-select { flex: 1; min-width: 0; }
+  .energy-navigation select { flex: 1; min-width: 0; }
 }
 </style>

@@ -1,5 +1,5 @@
 const DAY = 86400000
-const fields = ['feedInPowerGrid', 'selfUsagePowerPv', 'selfUsagePowerBattery', 'consumptionGrid']
+const fields = ['feedInEnergyGrid', 'selfUsedEnergyPV', 'selfUsedEnergyBattery', 'gridUsedEnergy']
 
 function dateKey(time) {
   return `${time.slice(0, 4)}-${time.slice(4, 6)}-${time.slice(6, 8)}`
@@ -71,4 +71,4 @@ function chartBuckets(index, mode, selectedDate) {
     soc: endSoc(index.dates.filter(date => date.startsWith(month)).flatMap(date => index.days[date]))
   }))
 }
-module.exports = { isoWeek, indexEnergyFlow, chartBuckets }
+export { isoWeek, indexEnergyFlow, chartBuckets }

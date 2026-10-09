@@ -1,68 +1,92 @@
 # pvtools
 
+Frontend des PV-Auslegungsrechners, gebaut mit [Vue 3](https://vuejs.org), [Vite](https://vite.dev), [Tailwind CSS](https://tailwindcss.com) und [Chart.js](https://www.chartjs.org). Die Simulation läuft in einem Web Worker, damit die Oberfläche bedienbar bleibt.
+
+## Requirements
+
+- Node.js 22.21+ on the supported 22.x line, or a supported newer LTS release (e.g. 24.x). Vite 8 requires at least Node.js 20.19 or 22.12.
+- NPM
+
 ## Build Setup
 
 ```bash
 # install dependencies
 $ npm install
 
-# serve with hot reload at localhost:3000
+# serve with hot reload at localhost:3000 (expects the backend at localhost:8082)
 $ npm run dev
 
-# build for production and launch server
+# build the static site into dist/
 $ npm run build
-$ npm run start
 
-# generate static project
-$ npm run generate
+# preview the build
+$ npm run preview
+
+# run the unit tests
+$ npm run test-all
 ```
 
-For detailed explanation on how things work, check out the [documentation](https://nuxtjs.org).
+## Environment variables (build time)
 
-## Special Directories
+| Variable            | Description                                                                                         | Default if not set                                          |
+| ------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| APP_URL             | Base URL of the backend, e.g. `https://pvtools.example.com`. The frontend posts to `$APP_URL/relay` | build: same origin (`/relay`), dev: `http://localhost:8082` |
+| GOOGLE_ANALYTICS_ID | Google Analytics 4 measurement ID (`G-...`), Google Analytics is disabled if empty                  | (not set)                                                   |
 
-You can create the following extra directories, some of which have special behaviors. Only `pages` is required; you can delete them if you don't want to use their functionality.
+## Docker
 
-### `assets`
+```bash
+# Build image with defaults (backend reachable under /relay of the same origin)
+$ docker build --tag pvtools-frontend:latest .
 
-The assets directory contains your uncompiled assets such as Stylus or Sass files, images, or fonts.
+# Build image with custom settings
+$ docker build --build-arg APP_URL=https://backend.example.com:8443 --build-arg GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX --tag pvtools-frontend:latest .
 
-More information about the usage of this directory in [the documentation](https://nuxtjs.org/docs/2.x/directory-structure/assets).
+# Run image
+$ docker run --publish 8080:8080 pvtools-frontend:latest
+```
 
-### `components`
+## Structure
 
-The components directory contains your Vue.js components. Components make up the different parts of your page and can be reused and imported into your pages, layouts and even other components.
+| Path                    | Content                                                                                                                                      |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `main.js`, `style.css`  | App entry, Tailwind theme (light/dark colors, fonts)                                                                                         |
+| `router.js`             | Routes `/`, `/impress`, `/consumptionProfiles`                                                                                               |
+| `pages/`                | Pages                                                                                                                                        |
+| `components/inputs/`    | Input steps (location, roofs, consumption, costs, expert settings)                                                                           |
+| `components/results/`   | Recommendation, KPIs, charts, table and details                                                                                              |
+| `components/ui/`        | Small building blocks (cards, number fields, compass)                                                                                        |
+| `composables/`          | Shared state (`useCalculator`) and dark mode (`useTheme`)                                                                                    |
+| `lib/`                  | Backend/PVGIS requests, number formatting, chart theme, downloads                                                                            |
+| `data/faq.js`           | FAQ and news                                                                                                                                 |
+| `functions/`            | Calculation logic (energy flow, simulation, load profiles, CSV) and tests, explained in [`functions/BERECHNUNG.md`](functions/BERECHNUNG.md) |
+| `functions/*.worker.js` | Web Worker running the simulation                                                                                                            |
+| `public/`               | Static files, served as is                                                                                                                   |
 
-More information about the usage of this directory in [the documentation](https://nuxtjs.org/docs/2.x/directory-structure/components).
+## Fork enhancements
 
-### `layouts`
+- Local Windows development with the existing VS Code backend/frontend tasks;
+	see the [root README](../README.md#lokal-unter-windows-starten).
+- `custom-consumption.yaml` bundles additional scheduled appliances (`heating`)
+	and weekly EV replenishment events (`electric-car`) into the simulation worker.
+	They add to either the generated household profile or imported consumption,
+	without rescaling YAML energy or mutating the base profile. Avoid double counting
+	these loads in household input, imported data, or the separate beta load controls.
+- Schedules follow German local wall-clock hourly labels, including a fixed
+	24-bucket day at daylight-saving transitions. EV percentages describe energy
+	replenished to 100%, with configured power up to 80% SOC and
+	`min(power, 3600 W)` thereafter. Calendar carry-in and partial-hour energy are
+	preserved; overlapping events for the same vehicle are rejected.
+- The worker returns `consumptionSummary` alongside results and hours, containing
+	base/custom/total kWh and per-consumer starts, hours, and energy. Separate beta
+	loads remain part of the simulation results, not this YAML summary.
+- The backend relay restricts upstream targets, disables redirects, supports
+	operator-configured `RELAY_USER_AGENT` / `NOMINATIM_EMAIL`, and forwards actual
+	upstream HTTP responses. Its 15-second timeout maps transport timeouts to 504
+	and other transport failures to 502.
 
-Layouts are a great help when you want to change the look and feel of your Nuxt app, whether you want to include a sidebar or have distinct layouts for mobile and desktop.
-
-More information about the usage of this directory in [the documentation](https://nuxtjs.org/docs/2.x/directory-structure/layouts).
-
-### `pages`
-
-This directory contains your application views and routes. Nuxt will read all the `*.vue` files inside this directory and setup Vue Router automatically.
-
-More information about the usage of this directory in [the documentation](https://nuxtjs.org/docs/2.x/get-started/routing).
-
-### `plugins`
-
-The plugins directory contains JavaScript plugins that you want to run before instantiating the root Vue.js Application. This is the place to add Vue plugins and to inject functions or constants. Every time you need to use `Vue.use()`, you should create a file in `plugins/` and add its path to plugins in `nuxt.config.js`.
-
-More information about the usage of this directory in [the documentation](https://nuxtjs.org/docs/2.x/directory-structure/plugins).
-
-### `static`
-
-This directory contains your static files. Each file inside this directory is mapped to `/`.
-
-Example: `/static/robots.txt` is mapped as `/robots.txt`.
-
-More information about the usage of this directory in [the documentation](https://nuxtjs.org/docs/2.x/directory-structure/static).
-
-### `store`
-
-This directory contains your Vuex store files. Creating a file in this directory automatically activates Vuex.
-
-More information about the usage of this directory in [the documentation](https://nuxtjs.org/docs/2.x/directory-structure/store).
+See [functions/CUSTOM_CONSUMPTION.md](functions/CUSTOM_CONSUMPTION.md) for the
+calendar, units, worker response contract, and regression coverage, and the
+[root YAML guide](../README.md#zusätzlicher-verbrauch-aus-yaml) for complete
+configuration formats and examples. Use `consumptions: []` to disable YAML loads;
+production changes require a fresh frontend build.
