@@ -8,6 +8,7 @@
       <span class="ml-auto font-mono text-xs text-muted">{{
         batteryLabel(item.size)
       }}</span>
+      <HelpToggle v-model="showHelp" />
     </div>
 
     <div class="space-y-4">
@@ -30,25 +31,28 @@
           ></div>
         </div>
         <p v-if="row.note" class="mt-1 text-xs text-muted">{{ row.note }}</p>
+        <p v-if="showHelp && row.help" class="mt-1 text-xs text-muted">{{ row.help }}</p>
       </div>
     </div>
-    <p class="mt-4 text-xs text-muted">
-      Grün = Anteil aus eigener PV-Anlage und Speicher, rot = Netzbezug.
+    <p v-if="showHelp" class="mt-4 text-xs text-muted">
+      Türkis = Versorgung aus eigener PV-Anlage und Speicher, Blau = Netzbezug.
     </p>
   </section>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { Car, Heater, House } from 'lucide-vue-next'
 
 import { batteryLabel, kwh, pct } from '../../lib/format.js'
 import BetaBadge from '../ui/BetaBadge.vue'
+import HelpToggle from '../ui/HelpToggle.vue'
 
 const props = defineProps({
   item: { type: Object, required: true },
 })
 
+const showHelp = ref(false)
 const share = (part) =>
   part.consumption > 0 ? (part.selfUsed / part.consumption) * 100 : 0
 
@@ -81,7 +85,8 @@ const rows = computed(() => {
       note:
         ev.fromSurplus > 0
           ? `davon ${kwh(ev.fromSurplus)} mit PV-Überschuss geladen`
-          : 'Der Hausspeicher lädt das Auto nicht.',
+            : null,
+          help: ev.fromSurplus > 0 ? null : 'Der Hausspeicher lädt das Auto nicht.',
     })
   return list
 })

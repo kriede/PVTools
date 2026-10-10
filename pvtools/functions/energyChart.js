@@ -64,11 +64,16 @@ function chartBuckets(index, mode, selectedDate) {
       return { date, label: date.slice(8, 10), values: rows ? sum(rows) : null, soc: endSoc(rows || []) }
     })
   }
-  return [...new Set(index.dates.map(date => date.slice(0, 7)))].map(month => ({
-    month,
-    label: new Date(`${month}-01T00:00:00Z`).toLocaleDateString('de-DE', { month: 'short', timeZone: 'UTC' }),
-    values: sum(index.dates.filter(date => date.startsWith(month)).flatMap(date => index.days[date])),
-    soc: endSoc(index.dates.filter(date => date.startsWith(month)).flatMap(date => index.days[date]))
-  }))
+  return [...new Set(index.dates.map(date => date.slice(0, 7)))].map(month => {
+    const rows = index.dates.filter(date => date.startsWith(month)).flatMap(date => index.days[date])
+    const states = rows.map(row => row.newBatterySoc).filter(Number.isFinite)
+    return {
+      month,
+      label: new Date(`${month}-01T00:00:00Z`).toLocaleDateString('de-DE', { month: 'short', timeZone: 'UTC' }),
+      values: sum(rows), soc: endSoc(rows),
+      socMax: states.length ? Math.max(...states) : null,
+      socAverage: states.length ? states.reduce((total, state) => total + state, 0) / states.length : null,
+    }
+  })
 }
 export { isoWeek, indexEnergyFlow, chartBuckets }

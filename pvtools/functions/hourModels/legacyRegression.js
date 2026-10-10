@@ -140,7 +140,8 @@ export const regressionCalc = ({
 
   // discharge, the battery must not go below its minimum state of charge
   const usableBatteryEnergy = Math.max(batterySoc - batterySocMin, 0)
-  const batteryDischarge = Math.min(usedEnergyBattery, usableBatteryEnergy)
+  const batteryDischarge = Math.min(usedEnergyBattery, usableBatteryEnergy,
+    maxPowerDynamicInverter > 0 ? maxPowerDynamicInverter : Infinity)
   const selfUsedEnergyBattery = batteryDischarge * batteryUnloadEfficiency
   const lossesUnloadBattery = batteryDischarge - selfUsedEnergyBattery
 

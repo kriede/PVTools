@@ -24,6 +24,7 @@ import {
 import { useTheme } from '../composables/useTheme.js'
 import { axis, baseOptions, themeColors } from '../lib/chartTheme.js'
 import { batteryZeroAlignment } from '../lib/batteryAxis.js'
+import { calendarSeparators } from '../lib/chartSeparators.js'
 
 ChartJS.register(Title, Tooltip, Legend, BarElement, LineElement, PointElement,
   LineController, CategoryScale, LinearScale)
@@ -40,23 +41,38 @@ const props = defineProps({
   datasets: { type: Array, default: () => [] },
   axisTitle: { type: String, default: '' },
   showBatteryAxis: { type: Boolean, default: false },
+  separatorIndices: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['bar-click'])
 const { isDark } = useTheme()
 const chartData = computed(() => ({ labels: props.labels, datasets: props.datasets }))
-const chartPlugins = computed(() => [...props.plugins, batteryZeroAlignment])
+const chartPlugins = computed(() => [...props.plugins, batteryZeroAlignment, calendarSeparators])
 const chartOptions = computed(() => {
   void isDark.value
   const colors = themeColors()
   return {
     ...baseOptions(colors),
     locale: 'de-DE',
+    plugins: {
+      ...baseOptions(colors).plugins,
+      calendarSeparators: { indices: props.separatorIndices, color: colors.line },
+      tooltip: {
+        ...baseOptions(colors).plugins.tooltip,
+        callbacks: {
+          title: items => items[0]?.raw?.hourLabel ?? items[0]?.label ?? '',
+        },
+      },
+    },
     onClick: (event, elements) => {
       const bar = elements.find(element => props.datasets[element.datasetIndex]?.type !== 'line')
       if (bar) emit('bar-click', bar.index)
     },
     scales: {
       x: axis(colors, { stacked: true, grid: { display: false } }),
+      socTime: {
+        type: 'linear', display: false, position: 'bottom',
+        min: -0.5, max: props.labels.length - 0.5,
+      },
       y: axis(colors, {
         stacked: true,
         suggestedMax: props.showBatteryAxis ? 1 : undefined,

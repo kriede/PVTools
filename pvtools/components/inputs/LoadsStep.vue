@@ -9,15 +9,18 @@
     <div class="space-y-3">
       <!-- heat pump -->
       <div class="rounded-lg border border-line p-3">
-        <label class="flex cursor-pointer items-center gap-2.5">
-          <input
-            v-model="input.heatPumpEnabled"
-            type="checkbox"
-            class="h-4 w-4 accent-brand"
-          />
-          <Heater class="h-4 w-4 text-grid" />
-          <span class="text-sm font-medium">Wärmepumpe</span>
-        </label>
+        <div class="flex items-center justify-between gap-3">
+          <label class="flex cursor-pointer items-center gap-2.5">
+            <input
+              v-model="input.heatPumpEnabled"
+              type="checkbox"
+              class="h-4 w-4 accent-brand"
+            />
+            <Heater class="h-4 w-4 text-grid" />
+            <span class="text-sm font-medium">Wärmepumpe</span>
+          </label>
+          <HelpToggle v-model="heatPumpHelpVisible" />
+        </div>
 
         <div v-if="input.heatPumpEnabled" class="mt-3 space-y-3">
           <SegmentedControl
@@ -60,8 +63,10 @@
             hint="z. B. vom Wärmepumpen-Zähler"
           />
           <p class="font-mono text-xs text-muted">
-            ≈ {{ kwh(heatPumpKwh) }} Strom im Jahr, verteilt nach der
-            Außentemperatur am Standort
+            ≈ {{ kwh(heatPumpKwh) }} Strom im Jahr<span
+              v-if="heatPumpHelpVisible"
+              >, verteilt nach der Außentemperatur am Standort</span
+            >
           </p>
 
           <details class="group text-sm">
@@ -99,15 +104,18 @@
 
       <!-- electric car -->
       <div class="rounded-lg border border-line p-3">
-        <label class="flex cursor-pointer items-center gap-2.5">
-          <input
-            v-model="input.evEnabled"
-            type="checkbox"
-            class="h-4 w-4 accent-brand"
-          />
-          <Car class="h-4 w-4 text-feedin" />
-          <span class="text-sm font-medium">E-Auto</span>
-        </label>
+        <div class="flex items-center justify-between gap-3">
+          <label class="flex cursor-pointer items-center gap-2.5">
+            <input
+              v-model="input.evEnabled"
+              type="checkbox"
+              class="h-4 w-4 accent-brand"
+            />
+            <Car class="h-4 w-4 text-feedin" />
+            <span class="text-sm font-medium">E-Auto</span>
+          </label>
+          <HelpToggle v-model="evHelpVisible" />
+        </div>
 
         <div v-if="input.evEnabled" class="mt-3 space-y-3">
           <NumberField
@@ -134,12 +142,10 @@
               class="mb-1 flex items-center gap-1 text-xs font-medium text-muted"
             >
               Wie wird geladen?
-              <span
-                class="cursor-help"
-                title="Mit PV-Überschuss wird nur geladen, wenn Solarstrom übrig ist. Wird der Akku knapp, lädt das Auto aus dem Netz nach. Der Hausspeicher lädt das Auto nie."
-                ><Info class="h-3.5 w-3.5"
-              /></span>
             </div>
+            <p v-if="evHelpVisible" class="mb-2 text-xs text-muted">
+              Mit PV-Überschuss wird nur geladen, wenn Solarstrom übrig ist. Wird der Akku knapp, lädt das Auto aus dem Netz nach. Der Hausspeicher lädt das Auto nie.
+            </p>
             <SegmentedControl
               v-model="input.evChargingMode"
               :options="[
@@ -210,20 +216,19 @@
         Deine Messwerte dürfen Wärmepumpe und E-Auto nicht schon enthalten,
         sonst werden sie doppelt gezählt.
       </p>
-      <p
+      <HelpText
         v-if="input.heatPumpEnabled || input.evEnabled"
-        class="text-xs text-muted"
       >
         Beta: vereinfachte Modelle, noch nicht an Messdaten geprüft. Wie
         gerechnet wird, steht in den FAQ.
-      </p>
+      </HelpText>
     </div>
   </StepCard>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { Car, ChevronRight, Heater, Info } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { Car, ChevronRight, Heater } from 'lucide-vue-next'
 
 import { useCalculator } from '../../composables/useCalculator.js'
 import { evDailyEnergy } from '../../functions/loads/electricVehicle.js'
@@ -233,11 +238,15 @@ import {
 } from '../../functions/loads/heatPump.js'
 import { kwh } from '../../lib/format.js'
 import BetaBadge from '../ui/BetaBadge.vue'
+import HelpText from '../ui/HelpText.vue'
+import HelpToggle from '../ui/HelpToggle.vue'
 import NumberField from '../ui/NumberField.vue'
 import SegmentedControl from '../ui/SegmentedControl.vue'
 import StepCard from '../ui/StepCard.vue'
 
 const { input, consumptionMode } = useCalculator()
+const heatPumpHelpVisible = ref(false)
+const evHelpVisible = ref(false)
 
 const buildingOptions = Object.entries(BUILDING_STANDARDS).map(
   ([value, { label }]) => ({ value, label }),

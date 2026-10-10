@@ -69,7 +69,7 @@ const chartData = computed(() => ({
       data: props.sizes.map((s) => s.selfSufficiencyRate),
       yAxisID: 'percent',
       ...pointStyle(ENERGY_COLORS.battery),
-      fill: { target: 'origin', above: 'rgba(60, 207, 98, 0.08)' },
+      fill: { target: 'origin', above: `${ENERGY_COLORS.battery}14` },
     },
     {
       label: 'Eigenverbrauchsquote',

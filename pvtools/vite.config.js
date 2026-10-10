@@ -24,6 +24,12 @@ const staticRoutes = () => ({
 
 export default defineConfig(({ command }) => ({
   plugins: [vue(), tailwindcss(), staticRoutes()],
+  optimizeDeps: {
+    // YAML is also used by the simulation worker. Prepare it up front and
+    // publish optimized dependencies without waiting for all module requests.
+    include: ['yaml'],
+    holdUntilCrawlEnd: false,
+  },
   resolve: {
     alias: { '@': import.meta.dirname },
   },

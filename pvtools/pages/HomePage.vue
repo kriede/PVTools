@@ -87,7 +87,10 @@
               class="card flex items-center gap-3 px-5 py-4 font-mono text-sm"
             >
               <LoaderCircle class="h-5 w-5 animate-spin text-brand" />
-              {{ busyText }}
+              <span role="status" aria-live="polite">{{ busyText }}</span>
+              <button v-if="status === 'simulating'" type="button" class="text-muted hover:text-ink" @click="cancelSimulation">
+                Abbrechen
+              </button>
             </div>
           </div>
         </div>
@@ -146,7 +149,7 @@ import EmptyState from '../components/results/EmptyState.vue'
 import ResultsView from '../components/results/ResultsView.vue'
 import { useCalculator } from '../composables/useCalculator.js'
 
-const { status, error, results, consumptionSummary, missing, canCalculate, calculate, changeComparisonYear } =
+const { status, simulationProgress, cancelSimulation, error, results, consumptionSummary, missing, canCalculate, calculate, changeComparisonYear } =
   useCalculator()
 
 const summaryKwh = (value) => `${new Intl.NumberFormat('de-DE', {
@@ -176,11 +179,18 @@ watch(results, async (value) => {
 const busy = computed(() => status.value !== 'idle')
 
 const busyText = computed(
-  () =>
-    ({
+  () => {
+    const progress = simulationProgress.value
+    if (status.value === 'simulating' && progress) {
+      if (progress.stage === 'preparing') return 'bereite Jahresdaten vor …'
+      if (progress.stage === 'transferring') return 'übertrage Ergebnisse …'
+      return `simuliere Speichergrößen ${progress.completed + 1}/${progress.total} (${progress.size === 1 ? 'ohne Speicher' : `${progress.size / 1000} kWh`}) …`
+    }
+    return ({
       fetching: 'lade PV-Daten von PVGIS …',
       simulating: 'simuliere Speichergrößen …',
-    })[status.value],
+    })[status.value]
+  },
 )
 
 const buttonLabel = computed(() =>

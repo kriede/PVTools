@@ -8,7 +8,7 @@
  *
  *   build({ year, consumptionYear }) → { 'YYYYMMDD:HH': { P: Wh }, ... }
  *
- * The sum over all hours must equal consumptionYear (in Wh).
+ * consumptionYear is in kWh; hourly P values are in Wh.
  */
 import { calculateConsumption } from './energyFlow.js'
 import { factorFunction, PROFILEBASE, SLPH0 } from './SLP.js'
@@ -40,6 +40,68 @@ export const createRandom = (seed) => {
  * simulations of measured single-family households (see BERECHNUNG.md).
  */
 export const H0_VARIABILITY = { sigma: 1.0, rho: 0.75, seed: 1 }
+
+/** Default uses household annual kWh only, excluding all additional loads. */
+export const resolveHouseholdBaseload = (input) =>
+  Number(input.householdBaseloadW ?? (Number(input.yearlyConsumption) * 1000 / 365 / 24 / 4))
+
+/** Validate generated-profile settings without downloading generation data. */
+export const validateHouseholdProfile = (input) => {
+  const baseload = resolveHouseholdBaseload(input)
+  const sigma = Number(input.householdSigma ?? H0_VARIABILITY.sigma)
+  if (!Number.isFinite(baseload) || baseload < 0)
+    throw new Error('Haushaltslastprofil: Die Grundlast muss eine endliche, nicht negative Zahl sein.')
+  if (!Number.isFinite(sigma) || sigma < 0 || sigma > 5)
+    throw new Error('Haushaltslastprofil: Sigma muss zwischen 0 und 5 liegen.')
+  const year = Number(input.year)
+  const monthly = input.monthlyConsumptionEnabled && input.monthlyConsumption
+  const budgets = validMonthly(monthly)
+    ? monthly.map((kwh, month) => ({
+        wh: Number(kwh) * 1000,
+        hours: (Date.UTC(year, month + 1, 1) - Date.UTC(year, month, 1)) / 3600000,
+        period: `${year}-${String(month + 1).padStart(2, '0')}`,
+      }))
+    : [{
+        wh: Number(input.yearlyConsumption) * 1000,
+        hours: (Date.UTC(year + 1, 0, 1) - Date.UTC(year, 0, 1)) / 3600000,
+        period: `${year}`,
+      }]
+  for (const { wh, hours, period } of budgets) {
+    if (!Number.isFinite(wh) || wh < 0)
+      throw new Error('Haushaltslastprofil: Der Verbrauch muss eine endliche, nicht negative Zahl sein.')
+    if (baseload * hours > wh)
+      throw new Error(`Haushaltslastprofil: Die Grundlast übersteigt den verfügbaren Verbrauch für ${period}. Höchstens möglich: ${(wh / hours).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} W.`)
+  }
+}
+
+/** Reserve the constant load, distributing only the remaining energy by H0. */
+export const applyHouseholdBaseload = (consumption, input) => {
+  validateHouseholdProfile(input)
+  const baseload = resolveHouseholdBaseload(input)
+  // Preserve historical profiles exactly when the new option is disabled.
+  if (baseload === 0) return consumption
+  const monthly = input.monthlyConsumptionEnabled && input.monthlyConsumption
+  const useMonthly = validMonthly(monthly)
+  const periods = {}
+  for (const key of Object.keys(consumption)) {
+    const period = useMonthly ? Number(key.slice(4, 6)) - 1 : 0
+    ;(periods[period] ??= []).push(key)
+  }
+  const result = {}
+  for (const [period, keys] of Object.entries(periods)) {
+    const energy = Number(useMonthly ? monthly[period] : input.yearlyConsumption) * 1000
+    const residual = energy - baseload * keys.length
+    if (residual < 0) throw new Error('Haushaltslastprofil: Die Grundlast übersteigt die verfügbare Energie.')
+    const weight = keys.reduce((sum, key) => sum + consumption[key].P, 0)
+    for (const key of keys) {
+      result[key] = {
+        ...consumption[key],
+        P: baseload + residual * (weight > 0 ? consumption[key].P / weight : 1 / keys.length),
+      }
+    }
+  }
+  return result
+}
 
 /**
  * Add a deterministic hour-to-hour variability to a smooth profile.
@@ -148,7 +210,10 @@ export const CONSUMPTION_PROFILES = [
     label: 'H0 kalibriert',
     description:
       'H0 mit realistischen Schwankungen von Stunde zu Stunde. Tagesverbrauch, Jahreszeiten und Wochentage bleiben wie bei H0.',
-    build: (params) => addVariability(h0(params)),
+    build: (params) => addVariability(h0(params), {
+      ...H0_VARIABILITY,
+      sigma: Number(params.sigma ?? H0_VARIABILITY.sigma),
+    }),
   },
 ]
 

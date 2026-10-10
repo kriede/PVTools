@@ -1,6 +1,6 @@
 <template>
   <section id="faq" class="scroll-mt-20">
-    <div class="label-mono">// faq &amp; news</div>
+    <div class="label-mono">// fragen &amp; neuigkeiten</div>
     <h2 class="mt-1 font-display text-2xl font-bold">Fragen &amp; Antworten</h2>
     <div class="mt-6 grid gap-x-8 gap-y-6 md:grid-cols-2">
       <div v-for="group in groups" :key="group.realm">

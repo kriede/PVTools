@@ -66,24 +66,24 @@ $ docker run --publish 8080:8080 pvtools-frontend:latest
 ## Fork enhancements
 
 - Local Windows development with the existing VS Code backend/frontend tasks;
-	see the [root README](../README.md#lokal-unter-windows-starten).
+  see the [root README](../README.md#lokal-unter-windows-starten).
 - `custom-consumption.yaml` bundles additional scheduled appliances (`heating`)
-	and weekly EV replenishment events (`electric-car`) into the simulation worker.
-	They add to either the generated household profile or imported consumption,
-	without rescaling YAML energy or mutating the base profile. Avoid double counting
-	these loads in household input, imported data, or the separate beta load controls.
+  and weekly EV replenishment events (`electric-car`) into the simulation worker.
+  They add to either the generated household profile or imported consumption,
+  without rescaling YAML energy or mutating the base profile. Avoid double counting
+  these loads in household input, imported data, or the separate beta load controls.
 - Schedules follow German local wall-clock hourly labels, including a fixed
-	24-bucket day at daylight-saving transitions. EV percentages describe energy
-	replenished to 100%, with configured power up to 80% SOC and
-	`min(power, 3600 W)` thereafter. Calendar carry-in and partial-hour energy are
-	preserved; overlapping events for the same vehicle are rejected.
+  24-bucket day at daylight-saving transitions. EV percentages describe energy
+  replenished to 100%, with configured power up to 80% SOC and
+  `min(power, 3600 W)` thereafter. Calendar carry-in and partial-hour energy are
+  preserved; overlapping events for the same vehicle are rejected.
 - The worker returns `consumptionSummary` alongside results and hours, containing
-	base/custom/total kWh and per-consumer starts, hours, and energy. Separate beta
-	loads remain part of the simulation results, not this YAML summary.
+  base/custom/total kWh and per-consumer starts, hours, and energy. Separate beta
+  loads remain part of the simulation results, not this YAML summary.
 - The backend relay restricts upstream targets, disables redirects, supports
-	operator-configured `RELAY_USER_AGENT` / `NOMINATIM_EMAIL`, and forwards actual
-	upstream HTTP responses. Its 15-second timeout maps transport timeouts to 504
-	and other transport failures to 502.
+  operator-configured `RELAY_USER_AGENT` / `NOMINATIM_EMAIL`, and forwards actual
+  upstream HTTP responses. Its 15-second timeout maps transport timeouts to 504
+  and other transport failures to 502.
 
 See [functions/CUSTOM_CONSUMPTION.md](functions/CUSTOM_CONSUMPTION.md) for the
 calendar, units, worker response contract, and regression coverage, and the

@@ -26,6 +26,7 @@ import {
   axis,
   baseOptions,
   ENERGY_COLORS,
+  energyBarStyle,
   themeColors,
 } from '../../lib/chartTheme.js'
 import { num } from '../../lib/format.js'
@@ -56,8 +57,7 @@ const MONTHS = [
 const series = (label, key, color, sign = 1) => ({
   label,
   data: props.monthlyData.map((m) => (sign * m[key]) / 1000),
-  backgroundColor: color,
-  borderRadius: 3,
+  ...energyBarStyle(color),
   stack: 'energy',
   maxBarThickness: 34,
 })

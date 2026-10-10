@@ -90,6 +90,16 @@ Stunde). Oberhalb der Datenbank (ab 3.500 Wh pro Stunde) erzeugt
 5. **Netzbezug** ist der Teil des Verbrauchs, den weder PV noch Speicher
    decken.
 
+Die maximale Lade- und Entladeleistung wird in den Experten-Einstellungen in
+C angegeben (Standard jeweils 1 C, ausschließlich endliche Werte > 0).
+Für jede verglichene Nennkapazität gilt: Leistung in W = C-Rate × Kapazität in Wh.
+0,5 C entspricht bei 10 kWh somit 5 kW; auch C-Raten über 1 sind zulässig.
+Stundenmodell und netzdienliche Ladeplanung verwenden dieselbe umgerechnete
+Ladegrenze. Die bisherigen Wirkungsgradgrenzen bleiben unverändert.
+Alte gespeicherte Watt-Einstellungen werden durch den neuen Standard 1 C ersetzt;
+eine feste Watt-Grenze lässt sich nicht für alle Speichergrößen in eine einzige C-Rate umrechnen.
+Direkte ältere Simulationsaufrufe ohne C-Felder unterstützen weiterhin Watt-Grenzen.
+
 Laden und Entladen in derselben Stunde ist gewollt: Der Speicher deckt die
 Lastspitzen, während der PV-Überschuss der ruhigen Minuten ihn lädt.
 
@@ -140,6 +150,26 @@ ist der Durchschnitt sehr vieler Haushalte und deshalb sehr glatt: Mittags
 läuft immer etwas, es gibt keine Tage, an denen niemand zu Hause ist. Dadurch
 passt der Verbrauch besser zur PV-Erzeugung als bei einem echten Haushalt, die
 Autarkie fällt um 5–6 Prozentpunkte zu hoch aus (siehe Abgleich unten).
+
+### Advanced household profile parameters
+
+- `householdSigma` (default 1, range 0–5) changes the strength of calibrated
+  H0 hourly variability. Sigma 0 gives smooth H0. The seed (1) and correlation
+  (0.75) remain fixed. The classic profile does not use sigma.
+- `householdBaseloadW` defaults to annual household kWh × 1000 / 365 / 24 / 4 W,
+  excluding YAML, EV and heat-pump loads. A stored null keeps this default linked
+  to annual consumption; an explicit number (including 0) overrides it.
+  It reserves constant hourly household consumption
+  within the supplied budget. For each year, or each month with monthly input,
+  hourly energy is `B + (E - B * H) * weight / sum(weights)`, where `B` is
+  baseload in W, `E` is budget in Wh and `H` is the actual number of hours.
+  Variability affects the residual profile, never the constant floor.
+- Impossible annual/monthly budgets are rejected. Positive baseload normalizes
+  exactly to the specified budget; zero baseload preserves historical profile
+  results. Neither parameter changes imported measurements. YAML consumers are
+  still added afterwards, and separate heat-pump/EV loads remain unchanged.
+- The floor applies to hourly energy, not the subsequent intra-hour dispatch
+  approximation. Custom sigma/baseload depart from the original calibration.
 
 ### H0 kalibriert: `addVariability`
 

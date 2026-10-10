@@ -28,10 +28,10 @@
       />
 
       <div v-if="monthlyActive" class="mt-3">
-        <p class="mb-2 text-xs text-muted">
+        <HelpText class="mb-2">
           Verbrauch je Monat, z. B. von deinen Zählerständen. Vorbelegt mit der
           Verteilung des Lastprofils; die Summe ist der Jahresverbrauch.
-        </p>
+        </HelpText>
         <div class="grid grid-cols-3 gap-2">
           <NumberField
             v-for="(month, index) in MONTHS"
@@ -62,11 +62,11 @@
     </div>
 
     <div v-else class="mt-4 space-y-3">
-      <p class="text-xs text-muted">
+      <HelpText>
         Stündlicher Verbrauch in Wh, Spalten <code>Datetime</code> und
         <code>Power</code>. Die Werte können aus einem beliebigen Jahr stammen
         und werden auf das Wetterjahr übertragen.
-      </p>
+      </HelpText>
       <button type="button" class="btn-ghost w-full" @click="downloadTemplate">
         <Download class="h-4 w-4" />
         Vorlage {{ input.year }} herunterladen
@@ -83,7 +83,7 @@
           csvImport.fileName
         }}</span>
         <span v-else>CSV-Datei auswählen oder hier ablegen</span>
-        <span class="font-mono text-xs text-muted">Datetime;Power</span>
+        <HelpText class="font-mono">Datetime;Power</HelpText>
         <input
           type="file"
           accept=".csv,text/csv"
@@ -96,7 +96,7 @@
         <div
           v-for="message in analysis.errors"
           :key="message"
-          class="flex items-start gap-2 text-sm text-grid"
+          class="flex items-start gap-2 text-sm text-danger"
           role="alert"
         >
           <TriangleAlert class="mt-0.5 h-4 w-4 shrink-0" /> {{ message }}
@@ -152,7 +152,7 @@
         </p>
         <button
           type="button"
-          class="text-xs text-muted hover:text-grid"
+          class="text-xs text-muted hover:text-danger"
           @click="discardCsv"
         >
           Datei verwerfen
@@ -179,6 +179,7 @@ import {
 import { createTemplateCsv } from '../../functions/convertConsumptionUploads.js'
 import { downloadText } from '../../lib/download.js'
 import { kwh, num } from '../../lib/format.js'
+import HelpText from '../ui/HelpText.vue'
 import NumberField from '../ui/NumberField.vue'
 import SegmentedControl from '../ui/SegmentedControl.vue'
 import StepCard from '../ui/StepCard.vue'

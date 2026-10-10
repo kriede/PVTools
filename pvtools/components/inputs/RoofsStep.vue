@@ -37,7 +37,7 @@
         </button>
         <button
           type="button"
-          class="rounded-md p-1.5 text-muted hover:bg-surface hover:text-grid"
+          class="rounded-md p-1.5 text-muted hover:bg-surface hover:text-danger"
           title="Entfernen"
           @click="input.roofs.splice(index, 1)"
         >
@@ -63,7 +63,7 @@
     </p>
 
     <p v-if="input.roofs.some(roof => roof.peakpower >= 1000000)"
-      role="alert" class="mb-4 text-sm text-grid">
+      role="alert" class="mb-4 text-sm text-danger">
       Sehr hohe Dachleistung: Bitte die Einheit prüfen. Die Eingabe erfolgt in kWp,
       nicht in Wp — für 12.000 Wp bitte 12 kWp eingeben.
     </p>

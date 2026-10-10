@@ -8,6 +8,8 @@ const defaults = {
   installationCostsWithoutBattery: 1000, batteryCostsPerKwh: 500,
   batteryLoadEfficiency: 100, batteryUnloadEfficiency: 100,
   batterySocMinPercent: 0, amortizationYears: 1,
+  // These charging/headroom scenarios explicitly start with an empty battery.
+  batterySocInitialPercent: 0,
   linearDegrationModules: 0, linearConsumptionChange: 0,
   linearConsumptionCostsChange: 0, linearSelfUseRateChange: 0,
 }

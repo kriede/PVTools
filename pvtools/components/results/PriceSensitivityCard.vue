@@ -1,7 +1,12 @@
 <template>
   <section class="card p-4 sm:p-5">
-    <SectionTitle title="Was wäre, wenn sich die Preise ändern?" />
-    <p class="-mt-2 mb-4 text-sm text-muted">
+    <div class="flex items-start gap-3">
+      <div class="min-w-0 flex-1">
+        <SectionTitle title="Was wäre, wenn sich die Preise ändern?" />
+      </div>
+      <HelpToggle v-model="showHelp" />
+    </div>
+    <p v-if="showHelp" class="-mt-2 mb-4 text-sm text-muted">
       Verschiebe die Regler: Die Empfehlung wird sofort neu bewertet. Die
       Energiemengen bleiben gleich, es ändern sich nur die Preise.
     </p>
@@ -112,7 +117,7 @@
           </tbody>
         </table>
       </div>
-      <p class="mt-2 text-xs text-muted">
+      <p v-if="showHelp" class="mt-2 text-xs text-muted">
         100 % = dein eingegebener Speicherpreis, – = kein Speicher. Feld
         anklicken, um die Werte zu übernehmen.
       </p>
@@ -121,7 +126,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 
 import {
   economicsFor,
@@ -129,6 +134,7 @@ import {
 } from '../../functions/priceSensitivity.js'
 import { num } from '../../lib/format.js'
 import SectionTitle from '../ui/SectionTitle.vue'
+import HelpToggle from '../ui/HelpToggle.vue'
 
 const props = defineProps({
   sizes: { type: Array, required: true },
@@ -137,6 +143,7 @@ const props = defineProps({
 })
 
 const FACTORS = [0.6, 0.8, 1, 1.2, 1.4]
+const showHelp = ref(false)
 
 const initial = () => ({
   electricity: props.input.consumptionCosts,

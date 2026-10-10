@@ -1,12 +1,50 @@
 import { Chart } from 'chart.js'
+import { energyStackCaps } from './energyStackCaps.js'
 
+Chart.register(energyStackCaps)
+
+// Home Assistant energy palette; keep the CSS energy tokens in sync.
 export const ENERGY_COLORS = {
-  pv: '#f5a524',
-  battery: '#3ccf62',
-  grid: '#ef5b5b',
-  feedin: '#3a9fe0',
+  pv: '#ff9800',
+  battery: '#4db6ac',
+  grid: '#488fc2',
+  feedin: '#8353d1',
+  batteryCharge: '#f06292',
   loss: '#8a94a6',
 }
+
+/** Assign rounded corners explicitly to the outermost nonzero stack segment. */
+export function energyBarRadius({ chart, dataset, datasetIndex, dataIndex }) {
+  const value = dataset.data[dataIndex]
+  if (!value) return 0
+  const outerIndex = chart.data.datasets.findLastIndex((candidate, index) => {
+    const candidateValue = candidate.data[dataIndex]
+    return chart.isDatasetVisible(index) &&
+      (candidate.type ?? chart.config.type) === 'bar' &&
+      candidate.stack === dataset.stack &&
+      candidate.yAxisID === dataset.yAxisID &&
+      (value > 0 ? candidateValue > 0 : candidateValue < 0)
+  })
+  if (datasetIndex !== outerIndex) return 0
+  return {
+    topLeft: value > 0 ? 4 : 0,
+    topRight: value > 0 ? 4 : 0,
+    bottomLeft: value < 0 ? 4 : 0,
+    bottomRight: value < 0 ? 4 : 0,
+  }
+}
+
+/** Home Assistant uses alpha 0x7F for fills and an opaque outline. */
+export const energyBarStyle = (color) => ({
+  energyStackCaps: true,
+  backgroundColor: `${color}7F`,
+  borderColor: color,
+  borderWidth: 1,
+  borderRadius: energyBarRadius,
+  // Round only the free end: top for positive stacks, bottom for negative ones.
+  borderSkipped: 'start',
+  inflateAmount: 0,
+})
 
 /** colors of the current theme, read from the CSS variables */
 export function themeColors() {

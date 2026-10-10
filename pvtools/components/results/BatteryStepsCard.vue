@@ -1,7 +1,12 @@
 <template>
   <section class="card p-4 sm:p-5">
-    <SectionTitle title="Lohnt sich ein größerer Speicher?" />
-    <p class="-mt-2 mb-3 text-sm text-muted">
+    <div class="flex items-start gap-3">
+      <div class="min-w-0 flex-1">
+        <SectionTitle title="Lohnt sich ein größerer Speicher?" />
+      </div>
+      <HelpToggle v-model="showHelp" />
+    </div>
+    <p v-if="showHelp" class="-mt-2 mb-3 text-sm text-muted">
       Jeder Balken zeigt, wie viel Strom aus dem Netz die nächste Speicherstufe
       zusätzlich einspart. Je größer der Speicher, desto weniger bringt jede
       weitere kWh.
@@ -80,13 +85,8 @@
       </table>
     </div>
 
-    <details class="group mt-3 text-sm">
-      <summary
-        class="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-brand select-none"
-      >
-        <ChevronRight class="h-3.5 w-3.5 transition group-open:rotate-90" />
-        So wird bewertet
-      </summary>
+    <div v-if="showHelp" class="mt-3 text-sm">
+      <p class="text-xs font-medium text-brand">So wird bewertet</p>
       <div class="mt-2 space-y-2 text-xs text-muted">
         <p>
           Jede Zeile vergleicht einen Speicher mit der nächstkleineren Größe.
@@ -110,18 +110,18 @@
           weiter, wie sich die Erweiterung lohnt.
         </p>
       </div>
-    </details>
+    </div>
   </section>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { ChevronRight } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
 
 import { ratingLimits } from '../../functions/batteryEconomics.js'
 import { eur, kwh, num, years } from '../../lib/format.js'
 import { RATINGS } from '../../lib/rating.js'
 import SectionTitle from '../ui/SectionTitle.vue'
+import HelpToggle from '../ui/HelpToggle.vue'
 import StepsChart from './StepsChart.vue'
 import { stepLabel } from './stepLabel.js'
 
@@ -131,6 +131,7 @@ const props = defineProps({
 })
 defineEmits(['select'])
 
+const showHelp = ref(false)
 const limits = computed(() => ratingLimits(props.economics.lifetime))
 const prices = computed(() => props.economics.prices)
 

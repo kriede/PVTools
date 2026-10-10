@@ -8,7 +8,7 @@
         </div>
         <p class="mt-3 text-sm text-muted">
           Open-Source-Rechner für Batteriespeicher an PV-Anlagen. Entstanden in
-          der Community rund um den
+          der Gemeinschaft rund um den
           <a
             href="https://akkudoktor.net"
             target="_blank"
@@ -19,7 +19,7 @@
         </p>
       </div>
       <div class="text-sm">
-        <div class="label-mono mb-3">// links</div>
+        <div class="label-mono mb-3">// verweise</div>
         <ul class="space-y-2">
           <li>
             <a
@@ -46,7 +46,7 @@
               href="https://github.com/nick81nrw/PVTools"
               target="_blank"
               rel="noopener"
-              ><Github class="h-4 w-4" /> Quellcode &amp; Issues</a
+              ><Github class="h-4 w-4" /> Quellcode &amp; Fehlermeldungen</a
             >
           </li>
         </ul>
@@ -66,7 +66,7 @@
           </li>
         </ul>
         <p class="mt-4 font-mono text-xs text-muted">
-          Daten: PVGIS © European Union · Geocoding: © OpenStreetMap
+          Daten: PVGIS © Europäische Union · Adresssuche: © OpenStreetMap
         </p>
       </div>
     </div>

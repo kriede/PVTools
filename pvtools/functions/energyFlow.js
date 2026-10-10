@@ -494,18 +494,14 @@ const generateDayTimeOrder = (year) => {
 const generateDayTimeValues = ({ consumption, powerGeneration, year }) => {
   return generateDayTimeOrder(year).reduce((prev, curr) => {
     if (powerGeneration[curr] && consumption[curr]) {
-      return [
-        ...prev,
-        {
+      prev.push({
           dayTime: curr,
           P: powerGeneration[curr].P,
           temperature: powerGeneration[curr].temperature,
           consumption: consumption[curr].P,
-        },
-      ]
-    } else {
-      return prev
+        })
     }
+    return prev
   }, [])
 }
 

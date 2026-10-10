@@ -3,6 +3,7 @@ import {
   normalizeHourlyRadiation,
   shiftUtcToGermanTime,
 } from '../functions/energyFlow.js'
+import { readPvgisCache, writePvgisCache } from './pvgisCache.js'
 
 // PVGIS 5.3 (PVGIS-SARAH3) provides hourly data from 2005 to 2023
 export const PVGIS_FIRST_YEAR = 2005
@@ -32,7 +33,7 @@ export async function relayRequest(url) {
       const data = await response.json().catch(() => null)
       if (!response.ok) {
         const error = new Error(
-          `Request failed with status code ${response.status}`,
+          `Anfrage mit Statuscode ${response.status} fehlgeschlagen`,
         )
         error.response = { status: response.status, data }
         throw error
@@ -95,15 +96,14 @@ export function buildPvgisUrl({
 export async function fetchGeneration({ roofs, lat, lon, loss, year }) {
   year = Number(year)
   if (!Number.isInteger(year) || year < PVGIS_FIRST_YEAR || year > PVGIS_LAST_YEAR) {
-    throw new Error('Unsupported PVGIS year')
+    throw new Error('Nicht unterstütztes PVGIS-Jahr')
   }
   if (!Array.isArray(roofs) || !roofs.length) {
-    throw new Error('No roofs to fetch')
+    throw new Error('Keine Dachflächen zum Datenabruf vorhanden')
   }
   const perRoof = await Promise.all(
     roofs.map(async (roof) => {
-      const data = await relayRequest(
-        buildPvgisUrl({
+      const url = buildPvgisUrl({
           lat,
           lon,
           loss,
@@ -111,18 +111,18 @@ export async function fetchGeneration({ roofs, lat, lon, loss, year }) {
           angle: roof.angle,
           aspect: roof.aspect,
           peakpower: roof.peakpower / 1000,
-        }),
-      )
-      const radiation = data?.outputs?.hourly
+        })
+      const cached = readPvgisCache(url, year)
+      const radiation = cached ?? (await relayRequest(url))?.outputs?.hourly
       if (!Array.isArray(radiation) || !radiation.length) {
-        throw new Error('PVGIS returned no hourly generation data')
+        throw new Error('PVGIS hat keine stündlichen Erzeugungsdaten geliefert')
       }
       // Validate the original UTC timestamps, not the local-time series:
       // shifting and wrapping New Year must not hide a wrong weather year.
       for (const row of radiation) {
         const time = row?.time
         if (typeof time !== 'string' || !/^\d{8}:\d{4}$/.test(time)) {
-          throw new Error('PVGIS returned an invalid UTC timestamp')
+          throw new Error('PVGIS hat einen ungültigen UTC-Zeitstempel geliefert')
         }
         const utcYear = Number(time.slice(0, 4))
         const month = Number(time.slice(4, 6))
@@ -133,20 +133,21 @@ export async function fetchGeneration({ roofs, lat, lon, loss, year }) {
         if (utcYear !== year || date.getUTCFullYear() !== year ||
           date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day ||
           hour > 23 || minute > 59 || !Number.isFinite(row.P) || row.P < 0) {
-          throw new Error(`PVGIS returned invalid hourly data for requested UTC year ${year}`)
+          throw new Error(`PVGIS hat ungültige stündliche Daten für das angeforderte UTC-Jahr ${year} geliefert`)
         }
       }
       // PVGIS uses UTC, the load profiles German local time
+      if (!cached) writePvgisCache(url, year, radiation)
       const normalized = normalizeHourlyRadiation(radiation)
       if (!Object.keys(normalized).length) {
-        throw new Error('PVGIS returned no usable hourly generation data')
+        throw new Error('PVGIS hat keine nutzbaren stündlichen Erzeugungsdaten geliefert')
       }
       const hourly = shiftUtcToGermanTime(
         normalized,
         year,
       )
       if (!Object.keys(hourly).length) {
-        throw new Error('PVGIS returned no usable hourly generation data')
+        throw new Error('PVGIS hat keine nutzbaren stündlichen Erzeugungsdaten geliefert')
       }
       const generationYear =
         Object.values(hourly).reduce((sum, { P }) => sum + P, 0) / 1000

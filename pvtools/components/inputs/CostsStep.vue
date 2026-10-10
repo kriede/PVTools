@@ -37,12 +37,10 @@
     <div class="mt-5">
       <div class="mb-2 flex items-center gap-1 text-xs font-medium text-muted">
         Speicherpreis
-        <span
-          class="cursor-help"
-          title="Mit eigenen Angeboten werden genau diese Speichergrößen verglichen"
-          ><Info class="h-3.5 w-3.5"
-        /></span>
       </div>
+      <HelpText class="mb-2">
+        Mit eigenen Angeboten werden genau diese Speichergrößen verglichen
+      </HelpText>
       <SegmentedControl
         v-model="input.batteryPriceMode"
         :options="[
@@ -74,10 +72,10 @@
       </div>
 
       <div v-else class="mt-3">
-        <p class="mb-2 text-xs text-muted">
+        <HelpText class="mb-2">
           Trage die Angebote ein, die du vergleichen möchtest. Genau diese
           Größen werden berechnet.
-        </p>
+        </HelpText>
         <div class="space-y-2">
           <div
             v-for="(offer, index) in input.batteryOffers"
@@ -122,11 +120,12 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Info, Plus, X } from 'lucide-vue-next'
+import { Plus, X } from 'lucide-vue-next'
 
 import { useCalculator } from '../../composables/useCalculator.js'
 import { batteryPrice } from '../../functions/batteryEconomics.js'
 import { eur } from '../../lib/format.js'
+import HelpText from '../ui/HelpText.vue'
 import NumberField from '../ui/NumberField.vue'
 import SegmentedControl from '../ui/SegmentedControl.vue'
 import StepCard from '../ui/StepCard.vue'

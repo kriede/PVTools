@@ -80,6 +80,80 @@ test('HomePage wires ResultsView event, busy state and German summary', () => {
   expect(source).toContain('consumptionSummary.year')
   expect(source).toContain('zusätzlich zu YAML')
 })
+
+test('battery C-rate defaults replace old watt settings and preserve saved C-rates', async () => {
+  expect(calculator.input.batteryChargeCRate).toBe(1)
+  expect(calculator.input.batteryDischargeCRate).toBe(1)
+  await restoreInput({ maxPowerLoadBattery: 5000, maxPowerGenerationBattery: 0 })
+  expect(calculator.input.batteryChargeCRate).toBe(1)
+  expect(calculator.input.maxPowerLoadBattery).toBeUndefined()
+  await restoreInput({ batteryChargeCRate: 0.5, batteryDischargeCRate: 2 })
+  await complete()
+  expect(workers[0].payload.input.batteryChargeCRate).toBe(0.5)
+  expect(workers[0].payload.input.batteryDischargeCRate).toBe(2)
+})
+
+test.each([0, -0.5, null])('invalid battery C-rate fails before PVGIS: %s', async value => {
+  calculator.input.batteryChargeCRate = value
+  await calculator.calculate()
+  expect(mocks.fetchGeneration).not.toHaveBeenCalled()
+  expect(workers).toHaveLength(0)
+  expect(calculator.error.value).toContain('Speicherleistung:')
+  expect(calculator.error.value).not.toContain('PVGIS')
+})
+
+test('advanced profile defaults, saved values, worker snapshot and persistence', async () => {
+  expect(calculator.input.householdBaseloadW).toBeNull()
+  expect(calculator.householdBaseloadW.value).toBeCloseTo(5000 * 1000 / 365 / 24 / 4, 6)
+  expect(calculator.input.householdSigma).toBe(1)
+  await restoreInput({ householdBaseloadW: 500, householdSigma: 0.4, yearlyConsumption: 6000 })
+  await complete()
+  expect(workers[0].payload.input.householdBaseloadW).toBe(500)
+  expect(workers[0].payload.input.householdSigma).toBe(0.4)
+  calculator.input.householdSigma = 0.5
+  await flush()
+  expect(calculator.isStale.value).toBe(true)
+  expect(localStorage.setItem).toHaveBeenCalledWith('storedInput', expect.stringContaining('"householdSigma":0.5'))
+})
+
+test.each([
+  { householdBaseloadW: 1000 },
+  { householdSigma: -1 },
+  { householdBaseloadW: 500, monthlyConsumptionEnabled: true, monthlyConsumption: [0, ...Array(11).fill(600)] },
+])('rejects invalid profile settings before downloading PVGIS: %j', async settings => {
+  Object.assign(calculator.input, settings)
+  await calculator.calculate()
+  expect(mocks.fetchGeneration).not.toHaveBeenCalled()
+  expect(workers).toHaveLength(0)
+  expect(calculator.error.value).toContain('Haushaltslastprofil:')
+  expect(calculator.error.value).not.toContain('PVGIS')
+})
+
+test('imported measurements bypass generated-profile validation', async () => {
+  calculator.input.householdBaseloadW = 10000
+  calculator.input.householdSigma = -1
+  calculator.consumptionMode.value = 'csv'
+  calculator.csvImport.value = { fileName: 'meter.csv', analysis: { year: 2020, errors: [], values: new Map([['source', 500]]) } }
+  await complete()
+  expect(workers[0].payload.importedConsumption['20200101:00'].P).toBe(500)
+  expect(calculator.error.value).toBeNull()
+})
+
+test('automatic baseload follows household annual consumption only until overridden', async () => {
+  calculator.input.yearlyConsumption = 6000
+  calculator.input.heatPumpEnabled = true
+  calculator.input.heatPumpConsumption = 9000
+  calculator.input.evEnabled = true
+  calculator.input.evKmPerYear = 50000
+  expect(calculator.householdBaseloadW.value).toBeCloseTo(6000000 / 365 / 24 / 4, 6)
+  await complete()
+  expect(workers[0].payload.input.householdBaseloadW).toBeCloseTo(6000000 / 365 / 24 / 4, 6)
+  calculator.householdBaseloadW.value = 500
+  calculator.input.yearlyConsumption = 7000
+  expect(calculator.householdBaseloadW.value).toBe(500)
+  await restoreInput({ yearlyConsumption: 7000, householdBaseloadW: 0 })
+  expect(calculator.householdBaseloadW.value).toBe(0)
+})
 test('grid-friendly charging defaults off and stops before PVGIS when price retrieval fails', async () => {
   expect(calculator.input.gridFriendlyChargingEnabled).toBe(false)
   calculator.input.gridFriendlyChargingEnabled = true
@@ -360,6 +434,28 @@ test('stalled worker times out after 120 seconds, retains results and ignores la
   expect(calculator.results.value).toBe(recovered)
   expect(calculator.results.value.meta.year).toBe(2019)
   expect(calculator.error.value).toBeNull()
+  expect(vi.getTimerCount()).toBe(0)
+})
+
+test('progress messages keep worker alive; cancellation preserves results and clears timeout', async () => {
+  vi.useFakeTimers()
+  await complete()
+  const previous = calculator.results.value
+  const pending = calculator.changeComparisonYear(2019)
+  await flush()
+  const worker = workers.at(-1)
+  worker.onmessage({ data: { type: 'progress', stage: 'simulating', completed: 1, total: 4, size: 5000 } })
+  expect(calculator.simulationProgress.value.completed).toBe(1)
+  expect(calculator.status.value).toBe('simulating')
+  expect(worker.terminate).not.toHaveBeenCalled()
+  expect(vi.getTimerCount()).toBe(1)
+  calculator.cancelSimulation()
+  await pending
+  expect(worker.terminate).toHaveBeenCalledTimes(1)
+  expect(calculator.results.value).toBe(previous)
+  expect(calculator.status.value).toBe('idle')
+  expect(calculator.simulationProgress.value).toBeNull()
+  expect(calculator.error.value).toContain('Simulation abgebrochen')
   expect(vi.getTimerCount()).toBe(0)
 })
 

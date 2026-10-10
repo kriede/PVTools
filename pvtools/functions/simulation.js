@@ -21,6 +21,32 @@ export const totalPeakPower = (input) =>
     0,
   )
 
+/** C-rates refer to nominal capacity in Wh; dispatch still uses watts. */
+export const validateBatteryCRates = (input) => {
+  for (const [key, label] of [
+    ['batteryChargeCRate', 'Ladeleistung'],
+    ['batteryDischargeCRate', 'Entladeleistung'],
+  ]) {
+    // Older simulation callers may still supply their explicit watt limits.
+    if (input[key] === undefined) continue
+    if (typeof input[key] !== 'number' || !Number.isFinite(input[key]) || input[key] <= 0) {
+      throw new Error(`Speicherleistung: Die maximale ${label} in C muss eine endliche Zahl größer als 0 sein.`)
+    }
+  }
+}
+
+export const resolveBatteryPowerLimits = (input, capacityWh) => {
+  validateBatteryCRates(input)
+  return {
+    maxPowerLoadBattery: input.batteryChargeCRate === undefined
+      ? input.maxPowerLoadBattery
+      : input.batteryChargeCRate * capacityWh,
+    maxPowerGenerationBattery: input.batteryDischargeCRate === undefined
+      ? input.maxPowerGenerationBattery
+      : input.batteryDischargeCRate * capacityWh,
+  }
+}
+
 /**
  * Effective power limits in W (= Wh per hour).
  * inverterPower 0 means no limit, feedInLimit Infinity means no limit.
@@ -97,21 +123,23 @@ export const simulateBatterySizes = ({
   input,
   batterySizes,
   regressionDb,
+  onProgress = () => {},
 }) => {
   let costSavingWithoutBattery
+  validateBatteryCRates(input)
   const { inverterPower, feedInLimit } = resolveLimits(input)
   // Validate every row before any dispatch, including baseline-only runs.
   const stressedHours = gridFriendlyStressHours(powerGenAndConsumption, input)
   const noBatteryFlows = []
+  const initialPercent = Number(input.batterySocInitialPercent ?? 50)
+  if (!Number.isFinite(initialPercent) || initialPercent < 0 || initialPercent > 100) {
+    throw new Error('Der anfängliche Ladezustand muss zwischen 0 und 100 Prozent liegen.')
+  }
 
   const batterySizesWithNoBattery = [1, ...batterySizes]
 
   const limitParams = {}
   if (inverterPower > 0) limitParams.maxPowerGenerationInverter = inverterPower
-  if (input.maxPowerGenerationBattery > 0)
-    limitParams.maxPowerGenerationBattery = input.maxPowerGenerationBattery
-  if (input.maxPowerLoadBattery > 0)
-    limitParams.maxPowerLoadBattery = input.maxPowerLoadBattery
   if (feedInLimit < Infinity) limitParams.maxPowerFeedIn = feedInLimit
 
   // heat pump and car (beta), the same for every battery size; the surplus
@@ -133,12 +161,14 @@ export const simulateBatterySizes = ({
     return flow.feedInEnergyGrid + flow.missedFeedInPowerGrid
   })
 
-  let BatterySizeResults = batterySizesWithNoBattery.map((size) => {
+  let BatterySizeResults = batterySizesWithNoBattery.map((size, sizeIndex) => {
+    const batteryLimits = resolveBatteryPowerLimits(input, size === 1 ? 0 : size)
+    onProgress({ completed: sizeIndex, total: batterySizesWithNoBattery.length, size })
     const minSocWithoutBattery = 1
     let newSoc =
       size == 1
         ? minSocWithoutBattery
-        : (size * input.batterySocMinPercent) / 100
+        : (size * Math.max(initialPercent, input.batterySocMinPercent)) / 100
     const startSoc = newSoc
 
     let energyFlowData = powerGenAndConsumption.map((genConsumption, i) => {
@@ -164,14 +194,7 @@ export const simulateBatterySizes = ({
       }
       if (inverterPower > 0)
         energyFlowObj.maxPowerGenerationInverter = inverterPower
-      if (
-        input.maxPowerGenerationBattery &&
-        input.maxPowerGenerationBattery > 0
-      )
-        energyFlowObj.maxPowerGenerationBattery =
-          input.maxPowerGenerationBattery
-      if (input.maxPowerLoadBattery && input.maxPowerLoadBattery > 0)
-        energyFlowObj.maxPowerLoadBattery = input.maxPowerLoadBattery
+      Object.assign(energyFlowObj, batteryLimits)
       if (feedInLimit < Infinity) energyFlowObj.maxPowerFeedIn = feedInLimit
 
       if (stressedHours && size > 1) {
@@ -182,7 +205,7 @@ export const simulateBatterySizes = ({
           batterySocMin: energyFlowObj.batterySocMin,
           batterySocMax: size,
           batteryLoadEfficiency: energyFlowObj.batteryLoadEfficiency || 1,
-          maxPowerLoadBattery: input.maxPowerLoadBattery,
+          maxPowerLoadBattery: batteryLimits.maxPowerLoadBattery,
         })
       }
       const hourFlow = energyFlow(energyFlowObj)

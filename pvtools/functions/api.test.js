@@ -34,6 +34,13 @@ test('successful requests clear their timeout', async () => {
   expect(fetch.mock.calls[0][1].signal.aborted).toBe(false)
 })
 
+test('failed requests report the status code in German', async () => {
+  fetch.mockResolvedValue({ ok: false, status: 502, json: async () => ({}) })
+  await expect(relayRequest('https://example.test')).rejects.toThrow(
+    'Anfrage mit Statuscode 502 fehlgeschlagen',
+  )
+})
+
 test('requests matching years and kWp, accepts UTC New Year before timezone shifting', async () => {
   serve(response([row(), row('20191231:2310', 0), row('20190701:1210', 2000)]))
   const result = await fetchGeneration(params)
@@ -61,13 +68,13 @@ test.each([
 })
 test('rejects unsupported years and empty roof sets without fetching', async () => {
   for (const year of [PVGIS_FIRST_YEAR - 1, PVGIS_LAST_YEAR + 1, 2019.5, NaN]) {
-    await expect(fetchGeneration({ ...params, year })).rejects.toThrow('year')
+    await expect(fetchGeneration({ ...params, year })).rejects.toThrow('Nicht unterstütztes PVGIS-Jahr')
   }
-  await expect(fetchGeneration({ ...params, roofs: [] })).rejects.toThrow('roofs')
+  await expect(fetchGeneration({ ...params, roofs: [] })).rejects.toThrow('Keine Dachflächen zum Datenabruf vorhanden')
   expect(fetch).not.toHaveBeenCalled()
 })
 test('one failed roof rejects the entire generation request', async () => {
   fetch.mockResolvedValueOnce({ ok: true, json: async () => response([row()]) })
     .mockResolvedValueOnce({ ok: true, json: async () => response([row('20180101:0010')]) })
-  await expect(fetchGeneration({ ...params, roofs: [...roofs, ...roofs] })).rejects.toThrow('UTC year')
+  await expect(fetchGeneration({ ...params, roofs: [...roofs, ...roofs] })).rejects.toThrow('UTC-Jahr')
 })

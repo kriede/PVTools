@@ -3,11 +3,11 @@
     <div
       class="flex items-center gap-1.5 border-b border-line bg-surface-2 px-4 py-2"
     >
-      <span class="h-2.5 w-2.5 rounded-full bg-grid/70"></span>
+      <span class="h-2.5 w-2.5 rounded-full bg-danger/70"></span>
       <span class="h-2.5 w-2.5 rounded-full bg-pv/70"></span>
       <span class="h-2.5 w-2.5 rounded-full bg-battery/70"></span>
       <span class="ml-2 font-mono text-xs text-muted"
-        >pvtools — simulation</span
+        >pvtools — Simulation</span
       >
     </div>
     <div class="p-5 font-mono text-sm leading-relaxed sm:p-6">
@@ -33,20 +33,25 @@
     </div>
     <div class="grid gap-px border-t border-line bg-line sm:grid-cols-3">
       <div v-for="fact in facts" :key="fact.title" class="bg-surface p-4">
-        <component :is="fact.icon" class="h-5 w-5 text-brand" />
+        <div class="flex items-start justify-between gap-2">
+          <component :is="fact.icon" class="h-5 w-5 text-brand" />
+          <HelpToggle v-model="showHelp[fact.title]" />
+        </div>
         <div class="mt-2 text-sm font-semibold">{{ fact.title }}</div>
-        <p class="mt-1 text-xs text-muted">{{ fact.text }}</p>
+        <p v-if="showHelp[fact.title]" class="mt-1 text-xs text-muted">{{ fact.text }}</p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { BatteryCharging, Clock, SolarPanel } from 'lucide-vue-next'
 
 import { useCalculator } from '../../composables/useCalculator.js'
+import HelpToggle from '../ui/HelpToggle.vue'
 
+const showHelp = ref({})
 const { address, input, consumptionMode, importedConsumption, missing } =
   useCalculator()
 

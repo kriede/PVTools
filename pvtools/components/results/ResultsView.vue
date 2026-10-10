@@ -34,12 +34,17 @@
     </div>
 
     <div v-if="selected?.gridFriendlyCharging" class="card p-4 text-sm">
-      <p class="font-medium">Netzdienliches Laden · 24-Stunden-Vorschau</p>
+      <div class="flex items-start justify-between gap-3">
+        <p class="font-medium">Netzdienliches Laden · 24-Stunden-Vorschau</p>
+        <HelpToggle v-model="showGridFriendlyHelp" />
+      </div>
       <p class="mt-1 text-muted">
-        Niedrige Börsenpreise als Überschusssignal (keine lokale Netzüberlastungsprognose):
         {{ num(selected.gridFriendlyCharging.stressedHours) }} Stunden,
         {{ kwh(selected.gridFriendlyCharging.feedInDuringStressKwh) }} Einspeisung in diesen Stunden.
         {{ selected.gridFriendlyCharging.active ? 'PV-Ladung vorausschauend gesteuert.' : 'Referenz ohne Speicher.' }}
+      </p>
+      <p v-if="showGridFriendlyHelp" class="mt-1 text-muted">
+        Niedrige Börsenpreise als Überschusssignal (keine lokale Netzüberlastungsprognose).
         Ideale Prognosen; Stromtarif unverändert.
       </p>
     </div>
@@ -134,8 +139,10 @@
       <EnergyFlowChart
         :energy-flow="selected.energyFlow"
         :battery-capacity="selected.size"
+        :battery-sizes="results.sizes.map(item => item.size)"
         :years="comparisonYears"
         :busy="status !== 'idle'"
+        @battery-change="selectedSize = $event"
         @year-change="emit('comparison-year-change', $event)"
       />
     </section>
@@ -232,6 +239,7 @@ import BatteryStepsCard from './BatteryStepsCard.vue'
 import ConsumersCard from './ConsumersCard.vue'
 import PriceSensitivityCard from './PriceSensitivityCard.vue'
 import SectionTitle from '../ui/SectionTitle.vue'
+import HelpToggle from '../ui/HelpToggle.vue'
 import DetailsCard from './DetailsCard.vue'
 import EnergySplit from './EnergySplit.vue'
 import KpiGrid from './KpiGrid.vue'
@@ -257,6 +265,7 @@ const comparisonYears = Array.from(
   (_, index) => PVGIS_FIRST_YEAR + index,
 )
 const showDetails = ref(false)
+const showGridFriendlyHelp = ref(false)
 
 const recommendedItem = computed(() =>
   results.value.sizes.find((item) => item.size === recommendedSize.value),

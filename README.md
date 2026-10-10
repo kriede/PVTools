@@ -1,7 +1,9 @@
+# PVTools
+
 [![Website](https://img.shields.io/website?up_message=online&url=https%3A%2F%2Fpvtools.sektorsonne.de%2F)](https://pvtools.sektorsonne.de)
 
-# PVTools
 PV-Auslegungsrechner mit Unterstützung für
+
 - Batteriespeicher
 - Mehrere Dachflächen
 - Zusätzliche, zeitgesteuerte Verbraucher aus YAML
@@ -14,8 +16,8 @@ Das Projekt besteht aus einem **Vue-3-/Vite-Frontend** und einem
 ### Voraussetzungen
 
 - Node.js **22.21 oder neuer innerhalb der unterstützten 22.x-Reihe**, alternativ
-	eine unterstützte neuere LTS-Version (z. B. 24.x), sowie npm. Vite 8 benötigt
-	mindestens Node.js 20.19 oder 22.12; für dieses Projekt wird 22.21+ empfohlen.
+  eine unterstützte neuere LTS-Version (z. B. 24.x), sowie npm. Vite 8 benötigt
+  mindestens Node.js 20.19 oder 22.12; für dieses Projekt wird 22.21+ empfohlen.
 - Internetzugang für PVGIS und die Nominatim-Ortssuche; eine Datenbank ist nicht nötig.
 - Repository in VS Code öffnen. Die folgenden Pfade ggf. anpassen.
 
@@ -64,31 +66,31 @@ Build ersetzen das Backend nicht.
 ### Konfiguration und Sicherheit
 
 - Frontend: `APP_URL` ist die Backend-Basis-URL inklusive Protokoll und optionalem
-	Port. Ohne diese Variable verwendet Vite im Entwicklungsmodus localhost:8082,
-	im Build den gleichen Ursprung (`/relay`). Nach Änderungen neu starten bzw.
-	neu bauen. Weitere Build-Variablen stehen in [pvtools/README.md](pvtools/README.md).
+  Port. Ohne diese Variable verwendet Vite im Entwicklungsmodus localhost:8082,
+  im Build den gleichen Ursprung (`/relay`). Nach Änderungen neu starten bzw.
+  neu bauen. Weitere Build-Variablen stehen in [pvtools/README.md](pvtools/README.md).
 - Backend: `REQUEST_PORT` überschreibt Port 8082. Für die lokale Entwicklung
-	`NODE_ENV` nicht auf `production` setzen. Die aktuelle Produktions-CORS-Konfiguration
-	erwartet im **Backend** `APP_URL` als Frontend-Host ohne `https://` (sie ergänzt
-	das Protokoll selbst); das ist nicht dasselbe Format wie die Frontend-Variable.
+  `NODE_ENV` nicht auf `production` setzen. Die aktuelle Produktions-CORS-Konfiguration
+  erwartet im **Backend** `APP_URL` als Frontend-Host ohne `https://` (sie ergänzt
+  das Protokoll selbst); das ist nicht dasselbe Format wie die Frontend-Variable.
 - `RELAY_USER_AGENT` überschreibt die PVTools-Anwendungskennung.
-	`NOMINATIM_EMAIL` ergänzt bei Nominatim eine Betreiber-Kontaktadresse als
-	`email`-Queryparameter, sofern die Anfrage noch keinen enthält. Beide Variablen
-	vor dem Backend-Start setzen. Echte Kontaktdaten nicht im Repository hinterlegen;
-	die Adresse wird an Nominatim übertragen. Beispielwerte wären
-	`PVTools/1.0 (https://example.org/pvtools)` und `operator@example.org`.
+  `NOMINATIM_EMAIL` ergänzt bei Nominatim eine Betreiber-Kontaktadresse als
+  `email`-Queryparameter, sofern die Anfrage noch keinen enthält. Beide Variablen
+  vor dem Backend-Start setzen. Echte Kontaktdaten nicht im Repository hinterlegen;
+  die Adresse wird an Nominatim übertragen. Beispielwerte wären
+  `PVTools/1.0 (https://example.org/pvtools)` und `operator@example.org`.
 - Der Relay erlaubt nur `GET` über HTTPS zu `re.jrc.ec.europa.eu` und
-	`nominatim.openstreetmap.org`, ohne Zugangsdaten und nur auf dem Standardport
-	443. Weiterleitungen werden nicht verfolgt. Ungültige URLs ergeben 400,
-	unzulässige Methoden oder Ziele 403. Tatsächliche Upstream-HTTP-Statuscodes
-	und Antwortdaten werden weitergegeben, insbesondere 400 und 429.
+  `nominatim.openstreetmap.org`, ohne Zugangsdaten und nur auf dem Standardport
+  443. Weiterleitungen werden nicht verfolgt. Ungültige URLs ergeben 400,
+  unzulässige Methoden oder Ziele 403. Tatsächliche Upstream-HTTP-Statuscodes
+  und Antwortdaten werden weitergegeben, insbesondere 400 und 429.
 - Der **15-Sekunden-Timeout** bleibt für die lokalen Regressionstests erhalten
-	und beendet langsame Anfragen zeitnah statt erst nach 60 Sekunden.
-	Transport-Timeouts ergeben 504, sonstige Transportfehler 502.
+  und beendet langsame Anfragen zeitnah statt erst nach 60 Sekunden.
+  Transport-Timeouts ergeben 504, sonstige Transportfehler 502.
 - Backend nicht ungeschützt öffentlich freigeben: Die Ziel-Allowlist ersetzt
-	keine Zugriffskontrolle oder Ratenbegrenzung. Die
-	[Nominatim-Nutzungsrichtlinie](https://operations.osmfoundation.org/policies/nominatim/)
-	gilt weiterhin.
+  keine Zugriffskontrolle oder Ratenbegrenzung. Die
+  [Nominatim-Nutzungsrichtlinie](https://operations.osmfoundation.org/policies/nominatim/)
+  gilt weiterhin.
 
 ## Zusätzlicher Verbrauch aus YAML
 
@@ -128,12 +130,12 @@ für diese Stunde. Teilstunden und Ladephasenwechsel werden anteilig integriert.
 
 ```yaml
 consumptions:
-	- name: Pool heater in spring
-		type: heating
-		power: 2500
-		schedule: "05:00-22:00"
-		start-date: "2024-04-01"
-		end-date: "2024-05-31"
+  - name: Pool heater in spring
+    type: heating
+    power: 2500
+    schedule: "05:00-22:00"
+    start-date: "2024-04-01"
+    end-date: "2024-05-31"
 ```
 
 | Feld | Format | Bedeutung |
@@ -160,11 +162,11 @@ Endzeiten werden abgelehnt. Unabhängige Verbraucher addieren sich.
 
 ```yaml
 consumptions:
-	- name: Electric car
-		type: electric-car
-		power: 11000
-		capacity: 50000
-		starts: "monday:60%,20:00,wednesday:20%,08:00,friday:20%,15:00"
+  - name: Electric car
+    type: electric-car
+    power: 11000
+    capacity: 50000
+    starts: "monday:60%,20:00,wednesday:20%,08:00,friday:20%,15:00"
 ```
 
 | Feld | Format | Bedeutung |
@@ -189,7 +191,7 @@ Geladen wird mit `power` bis 80 % Ladezustand, danach mit
 
 - 20 % Nachladen: 10 kWh mit 3,6 kW, Dauer **2 h 46 min 40 s**.
 - 60 % Nachladen: Start bei 40 %, zunächst 20 kWh mit 11 kW bis 80 %, danach
-	10 kWh mit 3,6 kW; insgesamt ca. **4 h 35 min 45 s**.
+  10 kWh mit 3,6 kW; insgesamt ca. **4 h 35 min 45 s**.
 
 Ladevorgänge dürfen Mitternacht und den Jahreswechsel überschreiten. Die
 wiederkehrenden Starts der Vorwoche erhalten den Überhang vom Vorjahr.
@@ -207,18 +209,20 @@ Details zu Pipeline, Kalender und Tests:
 Die allgemeine Berechnung ist in
 [functions/BERECHNUNG.md](pvtools/functions/BERECHNUNG.md) dokumentiert.
 
-## API-Foundation:
-https://re.jrc.ec.europa.eu/api/v5_3/
+## API-Foundation
 
-https://re.jrc.ec.europa.eu/api/v5_3/SHScalc?lat=45&lon=8&outputformat=json&peakpower=10&batterysize=50&consumptionday=200&cutoff=40
+<https://re.jrc.ec.europa.eu/api/v5_3/>
+
+<https://re.jrc.ec.europa.eu/api/v5_3/SHScalc?lat=45&lon=8&outputformat=json&peakpower=10&batterysize=50&consumptionday=200&cutoff=40>
 
 Dokumentation:
 
-https://joint-research-centre.ec.europa.eu/pvgis-photovoltaic-geographical-information-system/getting-started-pvgis/api-non-interactive-service_en
+<https://joint-research-centre.ec.europa.eu/pvgis-photovoltaic-geographical-information-system/getting-started-pvgis/api-non-interactive-service_en>
 
 Frontend fragt Backend an mit:
 
 Anfrage-Body als JSON:
+
 - `url`: vollständige HTTPS-URL eines erlaubten Dienstes
 - `method`: `GET`
 

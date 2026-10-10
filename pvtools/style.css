@@ -51,11 +51,13 @@
     'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* energy colors, identical in both modes */
-  --color-pv: #f5a524;
-  --color-battery: #3ccf62;
-  --color-grid: #ef5b5b;
-  --color-feedin: #3a9fe0;
+  --color-pv: #ff9800;
+  --color-battery: #4db6ac;
+  --color-grid: #488fc2;
+  --color-feedin: #8353d1;
+  --color-battery-charge: #f06292;
   --color-loss: #8a94a6;
+  --color-danger: #ef5b5b;
 }
 
 @layer base {

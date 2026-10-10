@@ -48,7 +48,7 @@
     </div>
     <p
       v-if="addressNotFound"
-      class="mt-3 flex items-center gap-2 text-sm text-grid"
+      class="mt-3 flex items-center gap-2 text-sm text-danger"
     >
       <TriangleAlert class="h-4 w-4" />
       Adresse nicht gefunden – versuche es mit mehr Angaben.
@@ -57,11 +57,6 @@
     <label class="mt-4 block">
       <span class="mb-1 flex items-center gap-1 text-xs font-medium text-muted">
         Wetterjahr
-        <span
-          class="cursor-help"
-          title="Die Sonneneinstrahlung dieses Jahres wird simuliert. Vergleiche ruhig mehrere Jahre."
-          ><Info class="h-3.5 w-3.5"
-        /></span>
       </span>
       <select v-model.number="input.year" class="input">
         <option v-for="year in years" :key="year" :value="year">
@@ -69,13 +64,15 @@
         </option>
       </select>
     </label>
+    <HelpText class="mt-2">
+      Die Sonneneinstrahlung dieses Jahres wird simuliert. Vergleiche ruhig mehrere Jahre.
+    </HelpText>
   </StepCard>
 </template>
 
 <script setup>
 import {
   Check,
-  Info,
   LoaderCircle,
   MapPin,
   Search,
@@ -84,6 +81,7 @@ import {
 
 import { useCalculator } from '../../composables/useCalculator.js'
 import { PVGIS_FIRST_YEAR, PVGIS_LAST_YEAR } from '../../lib/api.js'
+import HelpText from '../ui/HelpText.vue'
 import StepCard from '../ui/StepCard.vue'
 
 const { input, address, addressQuery, addressNotFound, status, searchAddress } =

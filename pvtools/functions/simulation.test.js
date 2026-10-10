@@ -7,6 +7,8 @@ import {
   checkEnergyBalance,
   paybackYears,
   resolveLimits,
+  resolveBatteryPowerLimits,
+  validateBatteryCRates,
   simulateBatterySizes,
 } from './simulation.js'
 import { factorFunction, PROFILEBASE, SLPH0 } from './SLP.js'
@@ -22,6 +24,8 @@ const input = {
   batteryLoadEfficiency: 99,
   batteryUnloadEfficiency: 99,
   batterySocMinPercent: 10,
+  // Keep the historical snapshot scenario at its original initial charge.
+  batterySocInitialPercent: 10,
   year: 2020,
   maxPowerGenerationInverter: 5000,
   maxPowerGenerationBattery: 0,
@@ -69,6 +73,62 @@ const KEYS = [
 ]
 
 describe('simulateBatterySizes', () => {
+  test('positive C-rates convert per nominal capacity, including fractional and high rates', () => {
+    const rates = { batteryChargeCRate: 0.5, batteryDischargeCRate: 2 }
+    expect(resolveBatteryPowerLimits(rates, 5000)).toEqual({ maxPowerLoadBattery: 2500, maxPowerGenerationBattery: 10000 })
+    expect(resolveBatteryPowerLimits(rates, 10000)).toEqual({ maxPowerLoadBattery: 5000, maxPowerGenerationBattery: 20000 })
+    expect(resolveBatteryPowerLimits(rates, 0)).toEqual({ maxPowerLoadBattery: 0, maxPowerGenerationBattery: 0 })
+    for (const key of ['batteryChargeCRate', 'batteryDischargeCRate']) {
+      for (const value of [0, -1, NaN, Infinity, null, '0.5']) {
+        expect(() => validateBatteryCRates({ ...rates, [key]: value })).toThrow('Speicherleistung:')
+      }
+    }
+  })
+
+  test('dispatch honors capacity-specific C-rates without changing the no-battery baseline', () => {
+    for (const hourModel of ['loadDistribution', 'legacyRegression']) {
+      const params = {
+        powerGenAndConsumption: [
+          { dayTime: '20200101:00', P: 20000, consumption: 0 },
+          { dayTime: '20200101:01', P: 0, consumption: 20000 },
+        ],
+        input: { ...input, hourModel, inverterMode: 'none', batterySocMinPercent: 0,
+          batterySocInitialPercent: 50, batteryLoadEfficiency: 100, batteryUnloadEfficiency: 100,
+          batteryChargeCRate: 0.25, batteryDischargeCRate: 0.1 },
+        batterySizes: [5000, 10000], regressionDb,
+      }
+      const [baseline, ...batteries] = simulateBatterySizes(params)
+      for (const result of batteries) {
+        expect(result.energyFlow[0].batteryCharge).toBeLessThanOrEqual(result.size * 0.25 + 1e-6)
+        expect(result.energyFlow[0].batteryCharge).toBeGreaterThan(0)
+        expect(result.energyFlow[1].batteryDischarge).toBeLessThanOrEqual(result.size * 0.1 + 1e-6)
+        expect(result.balance.ok).toBe(true)
+      }
+      const other = simulateBatterySizes({ ...params, input: { ...params.input, batteryChargeCRate: 2, batteryDischargeCRate: 2 } })[0]
+      expect(other.energyFlow).toEqual(baseline.energyFlow)
+    }
+  })
+
+  test('initial charge defaults to 50%, respects limits and balances a 10 MWh battery', () => {
+    const run = (percent) => simulateBatterySizes({
+      powerGenAndConsumption: [{ dayTime: '20200101:00', P: 0, consumption: 1000 }],
+      input: { ...input, batterySocInitialPercent: percent },
+      batterySizes: [10000000], regressionDb,
+    })
+    for (const [percent, expected] of [[undefined, 50], [0, 10], [25, 25], [100, 100]]) {
+      const [baseline, battery] = run(percent)
+      expect(baseline.balance.ok).toBe(true)
+      expect(battery.balance.ok).toBe(true)
+      const hour = battery.energyFlow[0]
+      const reconstructedStart = hour.newBatterySoc - hour.batteryCharge
+        + hour.lossesLoadBattery + hour.batteryDischarge
+      expect(reconstructedStart).toBeCloseTo(10000000 * expected / 100, 6)
+    }
+    for (const invalid of [-1, 101, NaN, Infinity]) {
+      expect(() => run(invalid)).toThrow('anfängliche Ladezustand')
+    }
+  })
+
   test('annual consumption matches an independent UTC calendar calculation', () => {
     // Inclusive SLP season ends in leap-year day ordinals, independent of
     // calculateConsumption's date parsing and iteration. No day 367 exists.

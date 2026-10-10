@@ -1,16 +1,17 @@
 <template>
   <section aria-label="Energieflussdiagramm" :aria-busy="busy">
     <div class="energy-toolbar">
-      <h4 class="mb-0">Energiefluss</h4>
+      <div class="energy-heading">
+        <h4 class="mb-0">Energiefluss</h4>
+        <HelpToggle v-model="showHelp" controls="energy-flow-help" />
+      </div>
       <div class="energy-controls">
         <div class="energy-periods" role="group" aria-label="Diagrammzeitraum">
           <button v-for="period in periods" :key="period" type="button" :disabled="busy"
             :class="{ active: mode === period }"
             :aria-pressed="mode === period" @click="mode = period">{{ periodLabels[period] }}</button>
         </div>
-        <button type="button" :disabled="busy || mode === 'year'"
-          aria-label="Zur übergeordneten Ansicht" @click="drillOut">↑ Übersicht</button>
-        <select v-if="mode === 'year'" :value="simulationYear" :disabled="busy" aria-label="Vergleichsjahr"
+        <select :value="simulationYear" :disabled="busy" aria-label="Vergleichsjahr"
           @change="requestYear($event.target.value)">
           <option v-for="year in yearOptions" :key="year" :value="year">{{ year }}</option>
         </select>
@@ -31,17 +32,24 @@
             <button type="button" :disabled="busy || position >= available.length - 1"
               :aria-label="`Nächster Zeitraum: ${periodLabels[mode]}`" @click="move(1)">›</button>
         </div>
+        <select v-if="batterySizes.length" :value="batteryCapacity" :disabled="busy" aria-label="Speichergröße"
+          @change="requestBattery($event.target.value)">
+          <option v-for="size in batterySizes" :key="size" :value="size">{{ size > 1 ? `${size / 1000} kWh` : 'Kein Speicher' }}</option>
+        </select>
       </div>
     </div>
-    <p v-if="feedInDominates" role="alert" class="mb-2 text-sm text-grid">
+    <p v-if="feedInDominates" role="alert" class="mb-2 text-sm text-danger">
       Die Netzeinspeisung ist mehr als hundertmal so groß wie der gesamte Verbrauch.
       Dadurch sind die Verbrauchsbalken kaum sichtbar. Bitte die Dachleistungen prüfen:
       Die Eingabe erfolgt in kWp, nicht in Wp.
     </p>
-    <small class="block text-muted mb-2">Netzeinspeisung wird unterhalb der Nulllinie dargestellt; PV-Eigenverbrauch, Batterie-Eigenverbrauch und Netzbezug oberhalb.</small>
-    <small v-if="mode === 'week'" class="block text-muted mb-2">Kalenderwochen laufen von Montag bis Sonntag. Jeder Balken entspricht einer Stunde. Leere Stunden liegen außerhalb der Simulation oder enthalten keine Daten.</small>
-    <small v-if="showBatterySoc" class="block text-muted mb-2">Der Batterie-Füllstand zeigt den Stand am Ende der Stunde.</small>
-    <BarChart :labels="buckets.map(bucket => bucket.label)" :datasets="datasets"
+    <div v-if="showHelp" id="energy-flow-help">
+      <small class="block text-muted mb-2">Netzeinspeisung wird unterhalb der Nulllinie dargestellt; PV-Eigenverbrauch, Batterie-Eigenverbrauch und Netzbezug oberhalb.</small>
+      <small v-if="mode === 'week'" class="block text-muted mb-2">Kalenderwochen laufen von Montag bis Sonntag. Jeder Balken entspricht einer Stunde. Leere Stunden liegen außerhalb der Simulation oder enthalten keine Daten.</small>
+      <small v-if="showBatterySoc" class="block text-muted mb-2">{{ mode === 'year' ? 'Ladezustand: monatliches Maximum und Mittelwert der Ladezustände am Ende jeder Stunde.' : 'Der Ladezustand wird für das Ende jeder Stunde dargestellt.' }}</small>
+    </div>
+    <BarChart :key="mode" :labels="buckets.map(bucket => bucket.label)" :datasets="datasets"
+          :separator-indices="separatorIndices"
           :axis-title="mode === 'year' ? 'Energie (kWh pro Monat)' : mode === 'month' ? 'Energie (kWh pro Tag)' : 'Energie (kWh pro Stunde)'"
           :show-battery-axis="showBatterySoc" @bar-click="drillDown" />
   </section>
@@ -49,27 +57,29 @@
 
 <script>
 import BarChart from './BarChart.vue'
+import HelpToggle from './ui/HelpToggle.vue'
 import { indexEnergyFlow, chartBuckets, isoWeek } from '../functions/energyChart.js'
-import { ENERGY_COLORS } from '../lib/chartTheme.js'
+import { ENERGY_COLORS, energyBarStyle } from '../lib/chartTheme.js'
 
 export default {
   name: 'EnergyFlowChart',
-  components: { BarChart },
-  emits: ['year-change'],
+  components: { BarChart, HelpToggle },
+  emits: ['year-change', 'battery-change'],
   props: {
     energyFlow: { type: Array, required: true },
     batteryCapacity: { type: Number, default: 0 },
+    batterySizes: { type: Array, default: () => [] },
     years: { type: Array, default: () => [] },
     busy: { type: Boolean, default: false }
   },
   data() {
     return {
-      periods: ['year', 'month', 'week', 'day'], mode: 'year', selectedDate: '',
+      periods: ['year', 'month', 'week', 'day'], mode: 'year', selectedDate: '', showHelp: false,
       periodLabels: { year: 'Jahr', month: 'Monat', week: 'Woche', day: 'Tag' }
     }
   },
   computed: {
-    showBatterySoc() { return this.batteryCapacity > 1 && (this.mode === 'week' || this.mode === 'day') },
+    showBatterySoc() { return this.batteryCapacity > 1 },
     index() { return indexEnergyFlow(this.energyFlow) },
     simulationYear() { return this.index.dates.length ? Number(this.index.dates[0].slice(0, 4)) : null },
     yearOptions() { return this.years.length ? this.years : [this.simulationYear].filter(Boolean) },
@@ -83,11 +93,21 @@ export default {
     weekOptions() {
       return this.index.weeks.map(week => {
         const end = new Date(new Date(`${week.start}T00:00:00Z`).getTime() + 6 * 86400000).toISOString().slice(0, 10)
-        const format = date => new Date(`${date}T00:00:00Z`).toLocaleDateString('de-DE', { timeZone: 'UTC' })
-        return { value: week.key, text: `KW ${week.key.slice(6)} / ${week.key.slice(0, 4)} · ${format(week.start)} – ${format(end)}` }
+        const startInYear = week.start < `${this.simulationYear}-01-01` ? `${this.simulationYear}-01-01` : week.start
+        const endInYear = end > `${this.simulationYear}-12-31` ? `${this.simulationYear}-12-31` : end
+        const format = date => `${date.slice(8, 10)}.${date.slice(5, 7)}.`
+        return { value: week.key, text: `KW${week.key.slice(6)} ${format(startInYear)} - ${format(endInYear)}` }
       })
     },
     buckets() { return this.selectedDate ? chartBuckets(this.index, this.mode, this.selectedDate) : [] },
+    separatorIndices() {
+      return this.buckets.flatMap((bucket, index) => {
+        if (index === 0) return []
+        if (this.mode === 'week') return index % 24 === 0 ? [index] : []
+        if (this.mode === 'month') return new Date(`${bucket.date}T00:00:00Z`).getUTCDay() === 1 ? [index] : []
+        return []
+      })
+    },
     feedInDominates() {
       const total = this.buckets.reduce((sum, bucket) => {
         if (bucket.values) {
@@ -105,15 +125,52 @@ export default {
         ['selfUsedEnergyBattery', 'Batterie-Eigenverbrauch', ENERGY_COLORS.battery, 1],
         ['gridUsedEnergy', 'Netzbezug', ENERGY_COLORS.grid, 1]
       ].map(([field, label, backgroundColor, sign]) => ({
-        label, backgroundColor, stack: 'energy', yAxisID: 'y',
+        label, ...energyBarStyle(backgroundColor), stack: 'energy', yAxisID: 'y',
+        ...(this.mode === 'week' ? { borderWidth: 0, hoverBorderWidth: 0 } : {}),
+        ...(this.mode === 'year' ? {} : {
+          // Derive widths from neighboring category centers, not the hidden
+          // hourly SOC axis ticks, which otherwise halve monthly bar widths.
+          // Chart.js measures widths in CSS pixels, including on HiDPI screens.
+          barThickness: this.mode === 'week' || this.mode === 'month'
+            ? ({ chart }) => {
+              const spacing = Math.abs(chart.scales.x.getPixelForValue(1) - chart.scales.x.getPixelForValue(0))
+              return this.mode === 'week' ? Math.max(0, spacing - 1) : spacing / 1.15
+            }
+            : 'flex',
+          categoryPercentage: 1,
+          barPercentage: this.mode === 'week' ? 1 : this.mode === 'month' ? 1 / 1.15 : 0.8,
+          // SOC lines are not an additional bar group. Center each day on its tick.
+          ...(this.mode === 'month' ? { grouped: false } : {}),
+        }),
         data: this.buckets.map(bucket => bucket.values ? bucket.values[field] * sign / 1000 : null)
       }))
-      if (this.showBatterySoc) energy.push({
-        type: 'line', label: 'Batterie-Füllstand (%)', yAxisID: 'soc',
-        borderColor: '#6f42c1', backgroundColor: '#6f42c1', borderWidth: 2,
-        pointRadius: this.mode === 'week' ? 0 : 2, fill: false, spanGaps: false, order: -1,
-        data: this.buckets.map(bucket => bucket.soc === null ? null : bucket.soc / this.batteryCapacity * 100)
-      })
+      if (this.showBatterySoc) {
+        const line = (label, color, data, extra = {}) => ({
+          type: 'line', label, yAxisID: 'soc',
+          borderColor: color, backgroundColor: color, borderWidth: 2,
+          pointRadius: this.mode === 'year' || this.mode === 'day' ? 2 : 0,
+          fill: false, spanGaps: false, order: -1, data, ...extra,
+        })
+        const percent = value => value == null ? null : value / this.batteryCapacity * 100
+        if (this.mode === 'year') {
+          energy.push(
+            line('Maximaler Ladezustand (%)', ENERGY_COLORS.batteryCharge, this.buckets.map(bucket => percent(bucket.socMax))),
+            line('Mittlerer Ladezustand (%)', ENERGY_COLORS.batteryCharge, this.buckets.map(bucket => percent(bucket.socAverage)), { borderDash: [5, 3] }),
+          )
+        } else if (this.mode === 'month') {
+          // Day bars use category centers 0..N-1; place each hourly state within
+          // its day's width using a separate, identically bounded linear axis.
+          const data = this.buckets.flatMap((bucket, day) =>
+            chartBuckets(this.index, 'day', bucket.date).map((hour, position) => ({
+              x: day - 0.5 + (position + 0.5) / 24,
+              y: percent(hour.soc),
+              hourLabel: `${bucket.date} ${hour.label}`,
+            })))
+          energy.push(line('Ladezustand (%)', ENERGY_COLORS.batteryCharge, data, { xAxisID: 'socTime' }))
+        } else {
+          energy.push(line('Ladezustand (%)', ENERGY_COLORS.batteryCharge, this.buckets.map(bucket => percent(bucket.soc))))
+        }
+      }
       return energy
     }
   },
@@ -121,11 +178,22 @@ export default {
     index: {
       immediate: true,
       handler(value) {
-        if (!value.days[this.selectedDate]) this.selectedDate = value.dates[0] || ''
+        if (!value.days[this.selectedDate]) {
+          const year = value.dates[0]?.slice(0, 4)
+          const matchingDate = year && this.selectedDate ? `${year}${this.selectedDate.slice(4)}` : ''
+          // A leap day maps to February 28 in a non-leap year.
+          const fallbackDate = matchingDate.endsWith('-02-29') ? `${year}-02-28` : ''
+          this.selectedDate = value.days[matchingDate] ? matchingDate
+            : value.days[fallbackDate] ? fallbackDate : value.dates[0] || ''
+        }
       }
     }
   },
   methods: {
+    requestBattery(size) {
+      const requested = Number(size)
+      if (!this.busy && this.batterySizes.includes(requested)) this.$emit('battery-change', requested)
+    },
     requestYear(year) {
       const requested = Number(year)
       if (!this.busy && this.yearOptions.includes(requested) && requested !== this.simulationYear) this.$emit('year-change', requested)
@@ -175,7 +243,8 @@ export default {
   align-items: center;
   gap: .75rem;
 }
-.energy-toolbar { justify-content: space-between; flex-wrap: wrap; margin-bottom: 1rem; }
+.energy-toolbar { flex-direction: column; align-items: flex-start; margin-bottom: 1rem; }
+.energy-heading { display: flex; align-items: center; justify-content: space-between; width: 100%; gap: .75rem; }
 .energy-controls { flex-wrap: wrap; }
 .energy-periods { display: flex; gap: .25rem; }
 .energy-controls button, .energy-controls select, .energy-controls input {

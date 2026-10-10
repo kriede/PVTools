@@ -12,12 +12,12 @@ import {
   recommendationSentences,
   recommendBattery,
 } from '../functions/batteryEconomics.js'
-import { getConsumptionProfile } from '../functions/consumptionProfiles.js'
+import { getConsumptionProfile, resolveHouseholdBaseload, validateHouseholdProfile } from '../functions/consumptionProfiles.js'
 import {
   DEFAULT_HOUR_MODEL,
   getHourModel,
 } from '../functions/hourModels/index.js'
-import { resolveLimits } from '../functions/simulation.js'
+import { resolveLimits, validateBatteryCRates } from '../functions/simulation.js'
 import { generateDayTimeOrder } from '../functions/energyFlow.js'
 import { gridFriendlyStressHours } from '../functions/gridFriendlyCharging.js'
 import { loadDayAheadPrices } from '../lib/dayAheadPrices.js'
@@ -34,6 +34,9 @@ const KEYS = {
 export const DEFAULT_INPUT = {
   roofs: [],
   yearlyConsumption: 5000,
+  // null keeps the default linked to yearly household consumption; numbers override it.
+  householdBaseloadW: null,
+  householdSigma: 1,
   // optional consumption per month in kWh (12 values, January first)
   monthlyConsumptionEnabled: false,
   monthlyConsumption: null,
@@ -73,12 +76,13 @@ export const DEFAULT_INPUT = {
   batteryLoadEfficiency: 99,
   batteryUnloadEfficiency: 99,
   batterySocMinPercent: 10,
+  batterySocInitialPercent: 50,
   year: 2020,
   // 'auto' = installed PV power, 'manual' = maxPowerGenerationInverter, 'none'
   inverterMode: 'auto',
   maxPowerGenerationInverter: 5000,
-  maxPowerGenerationBattery: 0,
-  maxPowerLoadBattery: 0,
+  batteryDischargeCRate: 1,
+  batteryChargeCRate: 1,
   gridFriendlyChargingEnabled: false,
   gridFriendlyPriceThreshold: 0,
   gridFriendlyPrices: null,
@@ -152,6 +156,10 @@ const migrateInput = (stored) => {
     }
   }
   delete migrated.batteryCostsFixed
+  // A fixed watt limit cannot be converted to one C-rate across all sizes.
+  // Legacy UI settings therefore adopt the new 1 C defaults, not their W values.
+  delete migrated.maxPowerLoadBattery
+  delete migrated.maxPowerGenerationBattery
   return migrated
 }
 
@@ -182,6 +190,9 @@ const csvImport = shallowRef(null) // { fileName, analysis }
 const fillMethod = ref('interpolate')
 
 const status = ref('idle') // 'idle' | 'geocoding' | 'fetching' | 'simulating'
+const simulationProgress = shallowRef(null)
+let cancelWorker = null
+const cancelSimulation = () => cancelWorker?.()
 const error = ref(null)
 const priceInfo = shallowRef(null)
 const priceLoading = ref(false)
@@ -215,6 +226,11 @@ const importedConsumption = computed(() => {
 })
 
 const limits = computed(() => resolveLimits(input))
+
+const householdBaseloadW = computed({
+  get: () => resolveHouseholdBaseload(input),
+  set: value => { input.householdBaseloadW = value },
+})
 
 /** sizes that are simulated: the offer sizes when own offers are used */
 const effectiveSizes = computed(() =>
@@ -306,6 +322,7 @@ const runWorker = (payload) =>
     const finish = (error, data) => {
       if (settled) return
       settled = true
+      cancelWorker = null
       clearTimeout(timer)
       worker.onmessage = null
       worker.onerror = null
@@ -317,6 +334,11 @@ const runWorker = (payload) =>
       finish(new Error('Die Simulation wurde nach 120 Sekunden wegen Zeitüberschreitung abgebrochen. Bitte versuche es erneut.'))
     }, 120000)
     worker.onmessage = ({ data }) => {
+      if (settled) return
+      if (data.type === 'progress') {
+        simulationProgress.value = data
+        return
+      }
       finish(data.error ? new Error(data.error) : null, data)
     }
     worker.onerror = (event) => {
@@ -326,6 +348,7 @@ const runWorker = (payload) =>
       finish(new Error('Die Ergebnisse der Simulation konnten nicht gelesen werden.'))
     }
     try {
+      cancelWorker = () => finish(new Error('Simulation abgebrochen.'))
       worker.postMessage(payload)
     } catch (error) {
       finish(error)
@@ -335,6 +358,7 @@ const runWorker = (payload) =>
 async function calculate() {
   if (!canCalculate.value) return
   error.value = null
+  simulationProgress.value = null
   const startedAt = performance.now()
   status.value = 'fetching'
   try {
@@ -348,7 +372,7 @@ async function calculate() {
       !Number.isInteger(plainInput.year) ||
       plainInput.year < PVGIS_FIRST_YEAR || plainInput.year > PVGIS_LAST_YEAR
     ) {
-      throw new Error(`Comparison year must be an integer between ${PVGIS_FIRST_YEAR} and ${PVGIS_LAST_YEAR}.`)
+      throw new Error(`Vergleichsjahr: Bitte eine ganze Zahl zwischen ${PVGIS_FIRST_YEAR} und ${PVGIS_LAST_YEAR} eingeben.`)
     }
     const plainAddress = JSON.parse(JSON.stringify(address.value))
     const mode = consumptionMode.value
@@ -357,6 +381,11 @@ async function calculate() {
       ? JSON.parse(JSON.stringify(importedConsumption.value))
       : null
     const calcSignature = signature()
+    validateBatteryCRates(plainInput)
+    if (mode !== 'csv') {
+      plainInput.householdBaseloadW = resolveHouseholdBaseload(plainInput)
+      validateHouseholdProfile(plainInput)
+    }
     if (plainInput.gridFriendlyChargingEnabled) {
       const rows = generateDayTimeOrder(plainInput.year).map(dayTime => ({ dayTime }))
       // Threshold errors are input errors, not a reason to download prices.
@@ -447,10 +476,11 @@ async function calculate() {
       ? e.message.replace('Custom consumption:', 'Zusätzlicher Stromverbrauch:')
       : e.message
     error.value =
-      `${status.value === 'fetching' && !message?.startsWith('Netzdienliches Laden:')
+      `${status.value === 'fetching' && !message?.startsWith('Speicherleistung:') && !message?.startsWith('Netzdienliches Laden:') && !message?.startsWith('Haushaltslastprofil:') && !message?.startsWith('Vergleichsjahr:')
         ? `Die PV-Erzeugungsdaten konnten nicht von PVGIS abgerufen werden${upstream ? `: ${upstream}` : '. Bitte versuche es später erneut.'}`
         : `Die Berechnung ist fehlgeschlagen: ${message}`}${results.value ? ' Vorhandene Ergebnisse bleiben unverändert.' : ''}`
   } finally {
+    simulationProgress.value = null
     status.value = 'idle'
   }
 }
@@ -495,6 +525,7 @@ function reset() {
 export function useCalculator() {
   return {
     input,
+    householdBaseloadW,
     batterySizes,
     effectiveSizes,
     address,
@@ -506,6 +537,8 @@ export function useCalculator() {
     importedConsumption,
     limits,
     status,
+    simulationProgress,
+    cancelSimulation,
     error,
     priceInfo,
     priceLoading,
