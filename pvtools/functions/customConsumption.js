@@ -57,18 +57,18 @@ function parseCustomConsumptions(text) {
     if (entry.type !== 'electric-car') fail(`${entry.name} benötigt den Typ (type) heating oder electric-car`)
     const capacity = positive(entry.capacity, `${entry.name}.capacity`)
     if (typeof entry.starts !== 'string' || !entry.starts.trim()) fail(`${entry.name} benötigt Ladebeginn-Angaben (starts)`)
-    const parts = entry.starts.split(',').map(part => part.trim())
-    if (parts.length % 2) fail(`${entry.name} hat einen unvollständigen Ladevorgang`)
     const events = []
-    for (let i = 0; i < parts.length; i += 2) {
-      const pair = parts[i].split(':')
+    for (const session of entry.starts.split(';')) {
+      const parts = session.split(',').map(part => part.trim())
+      if (parts.length !== 2 || parts.some(part => !part)) fail(`${entry.name} hat einen ungültigen Ladevorgang; erwartet wird Wochentag:Prozent%,HH:MM mit Semikolon zwischen Ladevorgängen`)
+      const pair = parts[0].split(':')
       const day = weekdays.indexOf(pair[0])
       if (pair.length !== 2 || day < 0 || !pair[1].endsWith('%')) fail(`${entry.name} hat einen ungültigen Ladevorgang; erwartet wird Wochentag:Prozent% mit englischem Wochentagsnamen`)
       const percentText = pair[1].slice(0, -1)
       if (!/^\d+(\.\d+)?$/.test(percentText)) fail(`${entry.name} hat eine ungültige Prozentangabe`)
       const percent = Number(percentText)
       if (percent <= 0 || percent > 100) fail(`${entry.name}: Die Prozentangabe muss größer als 0 und höchstens 100 sein`)
-      const start = minutes(parts[i + 1])
+      const start = minutes(parts[1])
       // Replenish the missing percentage to 100%, switching power at 80% SOC.
       const fastEnergy = capacity * Math.max(percent - 20, 0) / 100
       const topUpEnergy = capacity * Math.min(percent, 20) / 100

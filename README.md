@@ -166,7 +166,7 @@ consumptions:
     type: electric-car
     power: 11000
     capacity: 50000
-    starts: "monday:60%,20:00,wednesday:20%,08:00,friday:20%,15:00"
+    starts: "monday:60%,20:00;wednesday:20%,08:00;friday:20%,15:00"
 ```
 
 | Feld | Format | Bedeutung |
@@ -175,10 +175,11 @@ consumptions:
 | `type` | `electric-car` | Fahrzeug mit wöchentlichen Ladestarts |
 | `power` | Positive Zahl, W | Ladeleistung bis 80 % Ladezustand |
 | `capacity` | Positive Zahl, Wh | Batteriekapazität; 50000 bedeutet 50 kWh |
-| `starts` | `weekday:percentage%,HH:MM,...` | Abwechselnd Wochentag/Nachladeanteil und Startzeit |
+| `starts` | `weekday:percentage%,HH:MM;...` | Ladevorgänge mit Semikolon trennen; Komma zwischen Nachladeanteil und Startzeit |
 
 Wochentage sind kleingeschriebenes Englisch (`monday` bis `sunday`). Leerzeichen
-zwischen Einträgen und einstellige Stunden (`8:00`) sind erlaubt. Prozente müssen
+um Kommas und Semikolons und einstellige Stunden (`8:00`) sind erlaubt. Leere
+Ladevorgänge und ein abschließendes Semikolon sind nicht erlaubt. Prozente müssen
 größer als 0 und höchstens 100 sein.
 
 **Der Prozentwert ist die nachzuladende Energie bis 100 %, nicht der anfängliche

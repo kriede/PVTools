@@ -49,8 +49,8 @@ test('summaries report annual sessions, scheduled days, operating hours and kWh'
     heater({ schedule: '05:00-22:00', 'end-date': '2024-05-31' }),
     heater({ schedule: '08:00-19:00', 'start-date': '2024-06-01', 'end-date': '2024-08-31' }),
     heater({ schedule: '05:00-22:00', 'start-date': '2024-09-01', 'end-date': '2024-10-31' }),
-    car({ starts: 'monday:20%,20:00,tuesday:20%,20:00,wednesday:20%,08:00,friday:20%,08:00' }),
-    car({ starts: 'monday:20%,20:00,wednesday:20%,08:00,friday:20%,15:00' })
+    car({ starts: 'monday:20%,20:00;tuesday:20%,20:00;wednesday:20%,08:00;friday:20%,08:00' }),
+    car({ starts: 'monday:20%,20:00;wednesday:20%,08:00;friday:20%,15:00' })
   ])
   const summaries = summarizeCustomConsumptions(entries, '2020')
   expect(summaries[0]).toEqual({ name: entries[0].name, type: 'heating', count: 61, hours: 1037, energyKwh: 2592.5 })
@@ -177,9 +177,34 @@ test('top-up power never exceeds a lower configured charger power', () => {
 })
 
 test('overlap validation includes the slower top-up phase and allows back-to-back events', () => {
-  expect(() => parse([car({ starts: 'monday:20%,20:00,monday:20%,21:00' })])).toThrow('überschneidende Ladevorgänge')
-  expect(() => parse([car({ starts: 'saturday:20%,22:00,sunday:20%,00:00' })])).toThrow('überschneidende Ladevorgänge')
-  expect(() => parse([car({ capacity: 36000, starts: 'monday:20%,20:00,monday:20%,22:00' })])).not.toThrow()
+  expect(() => parse([car({ starts: 'monday:20%,20:00;monday:20%,21:00' })])).toThrow('überschneidende Ladevorgänge')
+  expect(() => parse([car({ starts: 'saturday:20%,22:00;sunday:20%,00:00' })])).toThrow('überschneidende Ladevorgänge')
+  expect(() => parse([car({ capacity: 36000, starts: 'monday:20%,20:00;monday:20%,22:00' })])).not.toThrow()
+})
+
+test('parses semicolon-separated charging sessions and whitespace around delimiters', () => {
+  const starts = 'monday:75%,20:00;wednesday:75%,10:00;thursday:50%,08:00'
+  const [entry] = parse([car({ starts })])
+  expect(entry.events.map(event => [event.day, event.start])).toEqual([
+    [1, 1200], [3, 600], [4, 480]
+  ])
+  expect(entry.events.map(event => event.stages.reduce((sum, stage) => sum + stage.power * stage.duration / 3600000, 0)))
+    .toEqual([37500, 37500, 25000])
+  expect(parse([car({ starts: ' monday:75% , 20:00 ; wednesday:75% , 10:00 ; thursday:50% , 8:00 ' })]))
+    .toEqual([entry])
+})
+
+test.each([
+  'monday:20%,20:00,wednesday:20%,08:00',
+  'monday:20%',
+  'monday:20%,',
+  ',20:00',
+  'monday:20%,20:00,extra',
+  ';monday:20%,20:00',
+  'monday:20%,20:00;',
+  'monday:20%,20:00;;wednesday:20%,08:00'
+])('rejects malformed charging-session delimiters: %s', starts => {
+  expect(() => parse([car({ starts })])).toThrow('mit Semikolon zwischen Ladevorgängen')
 })
 
 test('a two-stage event carries its slower phase across New Year', () => {
@@ -197,8 +222,8 @@ test.each([
   car({ capacity: -1 }), car({ starts: 'monday:101%,20:00' }),
   car({ starts: 'monday:0%,20:00' }), car({ starts: 'monday:%,20:00' }),
   car({ starts: 'montag:20%,20:00' }), car({ starts: 'monday:20%' }),
-  car({ starts: 'monday:20%,20:00,monday:20%,20:30' }),
-  car({ starts: 'saturday:20%,23:30,sunday:20%,00:00' }),
+  car({ starts: 'monday:20%,20:00;monday:20%,20:30' }),
+  car({ starts: 'saturday:20%,23:30;sunday:20%,00:00' }),
   car({ power: 1 })
 ])('rejects invalid entry %#', entry => {
   expect(() => parse([entry])).toThrow('Custom consumption:')

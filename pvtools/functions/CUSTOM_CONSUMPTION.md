@@ -24,8 +24,11 @@ base profile and YAML unless their energy should intentionally be counted twice.
   the date). Both start dates are inclusive; winter ranges may wrap New Year.
   February 29 runs only in leap years. Overnight schedules continue beyond the
   final active start date. `00:00-24:00` means a full day.
-- EV `starts` alternates English weekday/percentage and start time, for example
-  `monday:60%,20:00,wednesday:20%,08:00`. The percentage is energy to replenish
+- EV `starts` separates complete charging sessions with semicolons, keeping a
+  comma between English weekday/percentage and start time, for example
+  `monday:60%,20:00;wednesday:20%,08:00`. Whitespace around delimiters is allowed;
+  empty sessions, trailing semicolons and comma-only session lists are rejected.
+  The percentage is energy to replenish
   **to 100%**, not starting SOC. Charging runs at configured power up to 80% SOC,
   then at `min(power, 3600 W)`. Overlapping events for one car are rejected,
   including overlap across the weekly boundary. Independent entries add together.
