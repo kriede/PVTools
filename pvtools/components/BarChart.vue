@@ -25,6 +25,7 @@ import { useTheme } from '../composables/useTheme.js'
 import { axis, baseOptions, themeColors } from '../lib/chartTheme.js'
 import { batteryZeroAlignment } from '../lib/batteryAxis.js'
 import { calendarSeparators } from '../lib/chartSeparators.js'
+import { nearestBarIndex } from '../lib/chartClick.js'
 
 ChartJS.register(Title, Tooltip, Legend, BarElement, LineElement, PointElement,
   LineController, CategoryScale, LinearScale)
@@ -63,9 +64,9 @@ const chartOptions = computed(() => {
         },
       },
     },
-    onClick: (event, elements) => {
-      const bar = elements.find(element => props.datasets[element.datasetIndex]?.type !== 'line')
-      if (bar) emit('bar-click', bar.index)
+    onClick: (event, _elements, chart) => {
+      const index = nearestBarIndex(event, chart)
+      if (index !== null) emit('bar-click', index)
     },
     scales: {
       x: axis(colors, { stacked: true, grid: { display: false } }),

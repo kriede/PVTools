@@ -55,18 +55,46 @@ test('all energy chart periods use the Home Assistant energy palette', () => {
   const { vm, unmount } = mount({ energyFlow: [row('20230101:12')], batteryCapacity: 10000 })
   for (const mode of ['year', 'month', 'week', 'day']) {
     vm.mode = mode
-    expect(vm.datasets.slice(0, 4).map(dataset => dataset.backgroundColor)).toEqual([
-      '#8353d17F', '#ff98007F', '#4db6ac7F', '#488fc27F',
+    const alpha = mode === 'week' ? '99' : '7F'
+    expect(vm.datasets.slice(0, 5).map(dataset => dataset.backgroundColor)).toEqual(
+      ['#8353d1', '#ff9800', '#4db6ac', '#488fc2', '#f06292'].map(color => `${color}${alpha}`),
+    )
+    expect(vm.datasets.slice(0, 5).map(dataset => dataset.borderColor)).toEqual([
+      '#8353d1', '#ff9800', '#4db6ac', '#488fc2', '#f06292',
     ])
-    expect(vm.datasets.slice(0, 4).map(dataset => dataset.borderColor)).toEqual([
-      '#8353d1', '#ff9800', '#4db6ac', '#488fc2',
-    ])
-    expect(vm.datasets.slice(0, 4).every(dataset => dataset.borderWidth === (mode === 'week' ? 0 : 1))).toBe(true)
+    expect(vm.datasets.slice(0, 5).every(dataset => dataset.borderWidth === (mode === 'week' ? 0 : 1))).toBe(true)
     if (mode === 'week') {
-      expect(vm.datasets.slice(0, 4).every(dataset => dataset.hoverBorderWidth === 0)).toBe(true)
+      expect(vm.datasets.slice(0, 5).every(dataset => dataset.hoverBorderWidth === 0)).toBe(true)
     }
     expect(vm.showBatterySoc).toBe(true)
-    expect(vm.datasets.slice(4).every(dataset => dataset.borderColor === '#f06292')).toBe(true)
+    expect(vm.datasets.slice(5).every(dataset => dataset.borderColor === '#f06292')).toBe(true)
+  }
+  unmount()
+})
+
+test('battery charging is aggregated and stacked pink below feed-in in every period', () => {
+  const { vm, unmount } = mount({ batteryCapacity: 10000, energyFlow: [
+    { ...row('20230102:12'), batteryCharge: 500, newBatterySoc: 400 },
+    { ...row('20230102:13'), batteryCharge: 1500, newBatterySoc: 1600 },
+    row('20230102:14'),
+  ] })
+  for (const mode of ['year', 'month', 'week', 'day']) {
+    vm.mode = mode
+    const feedIn = vm.datasets.find(dataset => dataset.label === 'Netzeinspeisung')
+    const charging = vm.datasets.find(dataset => dataset.label === 'Batterieladung')
+    expect(charging.backgroundColor).toBe(mode === 'week' ? '#f0629299' : '#f062927F')
+    expect(charging.borderColor).toBe('#f06292')
+    expect(charging.stack).toBe(feedIn.stack)
+    expect(charging.yAxisID).toBe(feedIn.yAxisID)
+    expect(vm.datasets.indexOf(charging)).toBeGreaterThan(vm.datasets.indexOf(feedIn))
+    expect(charging.data.reduce((total, value) => total + (value ?? 0), 0)).toBe(-2)
+    expect(charging.data.every(value => value == null || value <= 0)).toBe(true)
+    if (mode === 'day') {
+      expect(charging.data[11]).toBeNull()
+      expect(charging.data[12]).toBe(-0.5)
+      expect(charging.data[13]).toBe(-1.5)
+      expect(charging.data[14]).toBe(-0)
+    }
   }
   unmount()
 })
@@ -98,7 +126,7 @@ test('daily chart orders hours and distinguishes missing data from zero', () => 
   expect(buckets[0].values.gridUsedEnergy).toBe(0)
   expect(buckets[1].values).toBeNull()
   expect(buckets[23]).toEqual({ date: '2020-02-29', label: '23:00', soc: null, values: {
-    feedInEnergyGrid: 1000, selfUsedEnergyPV: 2000, selfUsedEnergyBattery: 3000, gridUsedEnergy: 4000
+    feedInEnergyGrid: 1000, selfUsedEnergyPV: 2000, selfUsedEnergyBattery: 3000, gridUsedEnergy: 4000, batteryCharge: 0
   } })
 })
 
@@ -206,7 +234,7 @@ test('SOC lines, axis and hint appear in every view only with a battery', () => 
   for (const mode of ['year', 'month', 'week', 'day', 'month', 'year']) {
     wrapper.vm.mode = mode
     expect(wrapper.vm.showBatterySoc).toBe(true)
-    expect(wrapper.vm.datasets.filter(dataset => dataset.yAxisID === 'soc')).toHaveLength(mode === 'year' ? 2 : 1)
+    expect(wrapper.vm.datasets.filter(dataset => dataset.yAxisID === 'soc')).toHaveLength(1)
   }
   wrapper.unmount()
   const withoutBattery = mount({ batteryCapacity: 1, energyFlow: [row('20200229:23')] })
@@ -218,7 +246,7 @@ test('SOC lines, axis and hint appear in every view only with a battery', () => 
   expect(source('EnergyFlowChart')).toContain('v-if="showBatterySoc"')
 })
 
-test('annual SOC maximum and average use all finite hourly states, not daily endpoints', () => {
+test('annual SOC shows only the average of all finite hourly states, not daily endpoints', () => {
   const wrapper = mount({ batteryCapacity: 1000, energyFlow: [
     { ...row('20200101:23'), newBatterySoc: 100 },
     { ...row('20200101:00'), newBatterySoc: 900 },
@@ -226,8 +254,10 @@ test('annual SOC maximum and average use all finite hourly states, not daily end
     { ...row('20200102:01'), newBatterySoc: NaN },
     row('20200201:00'),
   ] })
-  expect(wrapper.vm.datasets[4].data).toEqual([90, null])
-  expect(wrapper.vm.datasets[5].data).toEqual([40, null])
+  const socLines = wrapper.vm.datasets.filter(dataset => dataset.yAxisID === 'soc')
+  expect(socLines).toHaveLength(1)
+  expect(socLines[0].label).toBe('Mittlerer Ladezustand (%)')
+  expect(socLines[0].data).toEqual([40, null])
   wrapper.unmount()
 })
 
@@ -241,7 +271,7 @@ test('monthly hourly SOC aligns within daily bars and preserves gaps and leap da
   wrapper.vm.mode = 'month'
   expect(wrapper.vm.buckets).toHaveLength(29)
   expect(wrapper.vm.datasets[0].data[0]).toBe(-2)
-  const hourly = wrapper.vm.datasets[4]
+  const hourly = wrapper.vm.datasets.find(dataset => dataset.yAxisID === 'soc')
   expect(hourly.xAxisID).toBe('socTime')
   expect(hourly.data).toHaveLength(29 * 24)
   expect(hourly.data[0]).toEqual({ x: -0.5 + 0.5 / 24, y: 0, hourLabel: '2020-02-01 00:00' })
@@ -269,8 +299,7 @@ test('chart drills down to matching week/day, drills out and emits year requests
   vm.drillDown(143)
   expect(vm.mode).toBe('day')
   expect(vm.selectedDate).toBe('2020-02-29')
-  expect(vm.datasets[4].data[23]).toBe(50)
-  expect(vm.datasets[4].yAxisID).toBe('soc')
+  expect(vm.datasets.find(dataset => dataset.yAxisID === 'soc').data[23]).toBe(50)
   for (const mode of ['week', 'month', 'year']) {
     vm.drillOut()
     expect(vm.mode).toBe(mode)

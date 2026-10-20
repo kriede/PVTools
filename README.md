@@ -8,10 +8,34 @@ PV-Auslegungsrechner mit Unterstützung für
 - Mehrere Dachflächen
 - Zusätzliche, zeitgesteuerte Verbraucher aus YAML
 
+Das Energieflussdiagramm zeigt die Batterieladung bei ausgewähltem Speicher als
+pinken Balken unterhalb der Netzeinspeisung, gestapelt unter der Nulllinie.
+Die Ladeenergie vor Ladeverlusten wird für Tag, Woche, Monat und Jahr aggregiert;
+der Ladezustand bleibt eine separate Linie.
+Die schmalen Stundenbalken der Wochenansicht verwenden dieselben Farbtöne ohne
+Kontur und mit 60 % statt rund 50 % Deckkraft, damit ihre Farbwirkung den breiteren
+Balken der anderen Ansichten ähnelt.
+Ein Klick innerhalb der Diagrammfläche wählt in allen Energieflussansichten den
+horizontal nächstgelegenen sichtbaren Balken, auch in den Zwischenräumen.
+Die Ladezustandslinie beeinflusst diese Auswahl nicht.
+
 ## Lokal unter Windows starten
 
 Das Projekt besteht aus einem **Vue-3-/Vite-Frontend** und einem
-**Express-/TypeScript-Backend**. Beide laufen in separaten PowerShell-Terminals.
+**Express-/TypeScript-Backend**. Both can run together in one terminal or separately.
+
+### Start both services with hot reload
+
+From the repository root, install dependencies once with `npm install`,
+`npm --prefix backend install`, and `npm --prefix pvtools install`.
+Then run `npm run dev` to start both services:
+
+- Frontend: <http://localhost:3000>, with Vite hot module replacement.
+- Backend: <http://localhost:8082>, with automatic TypeScript compilation and
+  server restart when TypeScript files change.
+
+Press **Ctrl+C** to stop both services. If either process exits, the other is
+stopped automatically. Stop existing instances before running this command.
 
 ### Voraussetzungen
 

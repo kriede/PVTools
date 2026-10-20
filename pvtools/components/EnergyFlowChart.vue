@@ -44,9 +44,9 @@
       Die Eingabe erfolgt in kWp, nicht in Wp.
     </p>
     <div v-if="showHelp" id="energy-flow-help">
-      <small class="block text-muted mb-2">Netzeinspeisung wird unterhalb der Nulllinie dargestellt; PV-Eigenverbrauch, Batterie-Eigenverbrauch und Netzbezug oberhalb.</small>
+      <small class="block text-muted mb-2">Netzeinspeisung wird unterhalb der Nulllinie dargestellt; die Batterieladung (pink, vor Ladeverlusten) darunter gestapelt. PV-Eigenverbrauch, Batterie-Eigenverbrauch und Netzbezug liegen oberhalb der Nulllinie.</small>
       <small v-if="mode === 'week'" class="block text-muted mb-2">Kalenderwochen laufen von Montag bis Sonntag. Jeder Balken entspricht einer Stunde. Leere Stunden liegen außerhalb der Simulation oder enthalten keine Daten.</small>
-      <small v-if="showBatterySoc" class="block text-muted mb-2">{{ mode === 'year' ? 'Ladezustand: monatliches Maximum und Mittelwert der Ladezustände am Ende jeder Stunde.' : 'Der Ladezustand wird für das Ende jeder Stunde dargestellt.' }}</small>
+      <small v-if="showBatterySoc" class="block text-muted mb-2">{{ mode === 'year' ? 'State of charge: monthly average of the states at the end of each hour.' : 'Der Ladezustand wird für das Ende jeder Stunde dargestellt.' }}</small>
     </div>
     <BarChart :key="mode" :labels="buckets.map(bucket => bucket.label)" :datasets="datasets"
           :separator-indices="separatorIndices"
@@ -123,10 +123,10 @@ export default {
         ['feedInEnergyGrid', 'Netzeinspeisung', ENERGY_COLORS.feedin, -1],
         ['selfUsedEnergyPV', 'PV-Eigenverbrauch', ENERGY_COLORS.pv, 1],
         ['selfUsedEnergyBattery', 'Batterie-Eigenverbrauch', ENERGY_COLORS.battery, 1],
-        ['gridUsedEnergy', 'Netzbezug', ENERGY_COLORS.grid, 1]
+        ['gridUsedEnergy', 'Netzbezug', ENERGY_COLORS.grid, 1],
+        ...(this.showBatterySoc ? [['batteryCharge', 'Batterieladung', ENERGY_COLORS.batteryCharge, -1]] : [])
       ].map(([field, label, backgroundColor, sign]) => ({
-        label, ...energyBarStyle(backgroundColor), stack: 'energy', yAxisID: 'y',
-        ...(this.mode === 'week' ? { borderWidth: 0, hoverBorderWidth: 0 } : {}),
+        label, ...energyBarStyle(backgroundColor, { compact: this.mode === 'week' }), stack: 'energy', yAxisID: 'y',
         ...(this.mode === 'year' ? {} : {
           // Derive widths from neighboring category centers, not the hidden
           // hourly SOC axis ticks, which otherwise halve monthly bar widths.
@@ -154,7 +154,6 @@ export default {
         const percent = value => value == null ? null : value / this.batteryCapacity * 100
         if (this.mode === 'year') {
           energy.push(
-            line('Maximaler Ladezustand (%)', ENERGY_COLORS.batteryCharge, this.buckets.map(bucket => percent(bucket.socMax))),
             line('Mittlerer Ladezustand (%)', ENERGY_COLORS.batteryCharge, this.buckets.map(bucket => percent(bucket.socAverage)), { borderDash: [5, 3] }),
           )
         } else if (this.mode === 'month') {

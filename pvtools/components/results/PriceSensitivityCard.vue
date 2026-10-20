@@ -76,7 +76,8 @@
           <thead>
             <tr>
               <th class="label-mono px-2 py-1.5 text-left font-normal">
-                Strom \ Speicher
+                Speicher&nbsp;→<br>
+                Strom&nbsp;↓
               </th>
               <th
                 v-for="factor in FACTORS"

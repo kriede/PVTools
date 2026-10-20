@@ -1,5 +1,9 @@
 {
+  "scripts": {
+    "dev": "concurrently --kill-others --names backend,frontend \"npm --prefix backend run dev\" \"npm --prefix pvtools run dev\""
+  },
   "devDependencies": {
+    "concurrently": "^10.0.6",
     "csv": "^6.3.5"
   }
 }

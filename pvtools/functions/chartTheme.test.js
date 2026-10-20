@@ -31,6 +31,15 @@ test('energy bars match Home Assistant fill alpha and opaque rounded outlines', 
   })
 })
 
+test.each(Object.values(ENERGY_COLORS))('compact energy bars preserve hue with stronger fill and no outline (%s)', (color) => {
+  expect(energyBarStyle(color, { compact: true })).toEqual({
+    ...energyBarStyle(color),
+    backgroundColor: `${color}99`,
+    borderWidth: 0,
+    hoverBorderWidth: 0,
+  })
+})
+
 test.each([
   [20, 10, 2],
   [0, 10, 1],

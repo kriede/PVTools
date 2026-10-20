@@ -34,12 +34,13 @@ export function energyBarRadius({ chart, dataset, datasetIndex, dataIndex }) {
   }
 }
 
-/** Home Assistant uses alpha 0x7F for fills and an opaque outline. */
-export const energyBarStyle = (color) => ({
+/** Narrow bars replace the opaque outline with a slightly stronger fill. */
+export const energyBarStyle = (color, { compact = false } = {}) => ({
   energyStackCaps: true,
-  backgroundColor: `${color}7F`,
+  backgroundColor: `${color}${compact ? '99' : '7F'}`,
   borderColor: color,
-  borderWidth: 1,
+  borderWidth: compact ? 0 : 1,
+  ...(compact ? { hoverBorderWidth: 0 } : {}),
   borderRadius: energyBarRadius,
   // Round only the free end: top for positive stacks, bottom for negative ones.
   borderSkipped: 'start',

@@ -1,5 +1,5 @@
 const DAY = 86400000
-const fields = ['feedInEnergyGrid', 'selfUsedEnergyPV', 'selfUsedEnergyBattery', 'gridUsedEnergy']
+const fields = ['feedInEnergyGrid', 'selfUsedEnergyPV', 'selfUsedEnergyBattery', 'gridUsedEnergy', 'batteryCharge']
 
 function dateKey(time) {
   return `${time.slice(0, 4)}-${time.slice(4, 6)}-${time.slice(6, 8)}`
